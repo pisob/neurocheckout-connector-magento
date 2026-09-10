@@ -1,0 +1,16 @@
+<?php
+/** @var \NeuroCheckout\Connector\Block\Telemetry $block */
+
+if (!$block->shouldRender()) {
+    return;
+}
+
+$config = $block->getTelemetryConfig();
+if (empty($config['endpoint']) || empty($config['token'])) {
+    return;
+}
+?>
+<script>
+window.ncCheckoutTelemetry = <?= /* @noEscape */ json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+</script>
+<script src="<?= $block->escapeUrl($block->getCheckoutTelemetryJsUrl()) ?>" defer></script>

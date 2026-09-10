@@ -1,0 +1,16 @@
+<?php
+/** @var \NeuroCheckout\Connector\Block\CustomerJourney $block */
+
+if (!$block->shouldRender()) {
+    return;
+}
+
+$config = $block->getCustomerJourneyConfig();
+if (empty($config['endpoint']) || empty($config['token'])) {
+    return;
+}
+?>
+<script>
+window.NCMagentoCustomerJourney = <?= /* @noEscape */ json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+</script>
+<script src="<?= $block->escapeUrl($block->getCustomerJourneyJsUrl()) ?>" defer></script>

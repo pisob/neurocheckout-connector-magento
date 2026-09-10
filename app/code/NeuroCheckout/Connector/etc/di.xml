@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="NeuroCheckout\Connector\Api\CouponManagementInterface"
+                type="NeuroCheckout\Connector\Model\Webapi\CouponManagement"/>
+    <preference for="NeuroCheckout\Connector\Api\CartRestoreManagementInterface"
+                type="NeuroCheckout\Connector\Model\Webapi\CartRestoreManagement"/>
+    <preference for="NeuroCheckout\Connector\Api\ApiKeySyncManagementInterface"
+                type="NeuroCheckout\Connector\Model\Webapi\ApiKeySyncManagement"/>
+    <preference for="NeuroCheckout\Connector\Api\ApiTestManagementInterface"
+                type="NeuroCheckout\Connector\Model\Webapi\ApiTestManagement"/>
+    <preference for="NeuroCheckout\Connector\Api\OrderHistoryManagementInterface"
+                type="NeuroCheckout\Connector\Model\Webapi\OrderHistoryManagement"/>
+    <preference for="NeuroCheckout\Connector\Api\SupportCaseManagementInterface"
+                type="NeuroCheckout\Connector\Model\Webapi\SupportCaseManagement"/>
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="neurocheckout_connector_run_cron" xsi:type="object">NeuroCheckout\Connector\Console\Command\RunCronCommand</item>
+                <item name="neurocheckout_connector_purge_data" xsi:type="object">NeuroCheckout\Connector\Console\Command\PurgeDataCommand</item>
+            </argument>
+        </arguments>
+    </type>
+</config>

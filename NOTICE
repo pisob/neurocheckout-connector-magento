@@ -1,0 +1,12 @@
+NeuroCheckout Connector for PrestaShop
+Copyright 2026 NeuroCheckout
+
+Licensed under the Apache License, Version 2.0.
+
+NeuroCheckout names, logos and other brand assets are trademarks or trade
+dress of their respective owner. The Apache License does not grant rights to
+use them except as required for reasonable attribution and identification of
+the software's origin.
+
+This connector is an interface to NeuroCheckout Cloud. The NeuroCheckout Cloud
+service, its business logic and agent orchestration are not part of this Work.

@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <section id="neurocheckoutconnector" translate="label comment" sortOrder="900" showInDefault="1" showInWebsite="1" showInStore="1">
+            <label>NeuroCheckout Connector</label>
+            <tab>general</tab>
+            <resource>NeuroCheckout_Connector::config</resource>
+
+            <group id="general" translate="label comment" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Configuration generale</label>
+                <field id="brand_header" translate="label comment" type="note" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>NeuroCheckout Connector</label>
+                    <comment>Repere visuel du module et de son espace de configuration.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\BrandHeader</frontend_model>
+                </field>
+                <field id="api_endpoint" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>API Endpoint</label>
+                    <comment>URL du backend NeuroCheckout utilisee pour le test API, le cron et l envoi des evenements.</comment>
+                </field>
+                <field id="api_key" translate="label comment" type="obscure" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>API Key</label>
+                    <comment>Cle fournie par NeuroCheckout. Conservez une valeur valide avant de lancer le test API.</comment>
+                    <backend_model>NeuroCheckout\Connector\Model\Config\Backend\ApiKey</backend_model>
+                </field>
+                <field id="shop_external_id" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Shop External ID</label>
+                    <comment>Identifiant boutique attendu par NeuroCheckout pour cette vue Magento.</comment>
+                </field>
+                <field id="general_status" translate="label comment" type="note" sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Etat et prechecks</label>
+                    <comment>Resume des verifications obligatoires avant tout envoi automatique.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\GeneralStatusNotice</frontend_model>
+                </field>
+                <field id="api_test_button" translate="label comment" type="button" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Tester l API</label>
+                    <comment>Etape recommandee apres sauvegarde: ce test valide la connexion et debloque le cron.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\TestApiButton</frontend_model>
+                </field>
+                <field id="opaque_recovery_links" translate="label comment" type="select" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Liens recovery opaques</label>
+                    <comment>Active les liens storefront single-use avec token `rt`. Si desactive, seuls les nouveaux liens repassent en mode signe legacy; les liens opaques deja emis restent acceptes.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+            </group>
+
+            <group id="ia" translate="label comment" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Parametres IA</label>
+                <field id="recovery_enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Relance automatique</label>
+                    <comment>Toujours active pour garantir les liens de recovery et la logique de panier abandonne.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\ReadonlyRecoveryEnabled</frontend_model>
+                </field>
+                <field id="enable_discount" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Autoriser les reductions IA</label>
+                    <comment>Demande une confirmation explicite avant d autoriser les remises automatiques.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\AllowDiscountConfirm</frontend_model>
+                </field>
+                <field id="min_cart_total" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Montant minimum du panier</label>
+                    <backend_model>NeuroCheckout\Connector\Model\Config\Backend\MinCartTotal</backend_model>
+                    <comment>Champ obligatoire. Nombre superieur ou egal a 0.</comment>
+                </field>
+                <field id="allow_guest" translate="label comment" type="select" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Autoriser la relance des clients invites</label>
+                    <comment>Active la relance des paniers invites dans la limite des garde-fous IA.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="no_discount_max" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Sans reduction jusqu a</label>
+                    <comment>Seuil de panier sous lequel aucune remise automatique n est proposee.</comment>
+                </field>
+                <field id="discount_5_min" translate="label comment" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Reduction de 5% a partir de</label>
+                    <comment>Montant a partir duquel la premiere tranche de remise peut etre appliquee.</comment>
+                </field>
+                <field id="discount_5_max" translate="label comment" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Reduction de 5% jusqu a</label>
+                    <comment>Plafond de panier pour rester dans la tranche de remise a 5%.</comment>
+                </field>
+                <field id="discount_10_min" translate="label comment" type="text" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Reduction de 10% a partir de</label>
+                    <comment>Montant a partir duquel la tranche haute de remise peut commencer.</comment>
+                </field>
+                <field id="max_discount_percent" translate="label comment" type="text" sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Reduction maximale IA (%)</label>
+                    <backend_model>NeuroCheckout\Connector\Model\Config\Backend\MaxDiscountPercent</backend_model>
+                    <comment>Champ obligatoire. Valeur entre 0 et 100.</comment>
+                </field>
+            </group>
+
+            <group id="execution" translate="label comment" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Cron et execution</label>
+                <field id="execution_mode" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Mode d execution du cron</label>
+                    <comment>Choisissez entre le cron Magento planifie et le module cron dedie selon votre exploitation.</comment>
+                    <source_model>NeuroCheckout\Connector\Model\Config\Source\ExecutionMode</source_model>
+                </field>
+                <field id="cron_interval_seconds" translate="label comment" type="note" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Intervalle cron</label>
+                    <comment>Frequence fixe recommandee pour le connecteur.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\FixedCronInterval</frontend_model>
+                </field>
+                <field id="debug_mode" translate="label comment" type="note" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Activer le mode debug cron</label>
+                    <comment>Autorise un test manuel securise. A desactiver apres diagnostic.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\DebugToggle</frontend_model>
+                </field>
+                <field id="debug_advanced" translate="label comment" type="note" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Activer le mode debug avance</label>
+                    <comment>Autorise une execution immediate avec de vraies donnees. Reserve a un diagnostic court.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\DebugToggle</frontend_model>
+                    <backend_model>NeuroCheckout\Connector\Model\Config\Backend\DebugAdvanced</backend_model>
+                </field>
+                <field id="telemetry_enabled" translate="label comment" type="select" sortOrder="45" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Telemetrie Business Alerts</label>
+                    <comment>Active les signaux techniques non sensibles pour l agent B-A-A: friction checkout, lenteurs, erreurs JavaScript, anomalies de requetes, frais de livraison et paiements echoues. Ne collecte pas les valeurs de formulaire ni les logs serveur bruts.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="customer_journey_enabled" translate="label comment" type="select" sortOrder="47" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Audit parcours client</label>
+                    <comment>Collecte les vues produit, intentions panier, passages panier/checkout, snapshots panier et commandes pour alimenter l agent C-J-R-A. Le flux est mis en file locale et n expose pas la cle API dans le navigateur.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="cron_allowed_ips" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>IPs autorisees pour le cron</label>
+                    <comment>Laissez vide pour aucune restriction. Recommande si vous exposez l URL signee.</comment>
+                    <depends>
+                        <field id="execution_mode">cron</field>
+                    </depends>
+                </field>
+                <field id="trusted_proxy_ips" translate="label comment" type="text" sortOrder="55" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Reverse proxies de confiance</label>
+                    <comment>Liste des IPs ou CIDR autorises a fournir `CF_CONNECTING_IP`, `X_REAL_IP` ou `X_FORWARDED_FOR`. Si vide, seul `REMOTE_ADDR` est pris en compte.</comment>
+                    <depends>
+                        <field id="execution_mode">cron</field>
+                    </depends>
+                </field>
+                <field id="cron_tools" translate="label comment" type="note" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Actions, commandes et URL</label>
+                    <comment>Outils de diagnostic et rappels de securite pour l execution manuelle.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\CronTools</frontend_model>
+                </field>
+                <field id="event_retention_days" translate="label comment" type="text" sortOrder="70" showInDefault="0" showInWebsite="0" showInStore="0">
+                    <label>Retention des evenements (jours)</label>
+                    <comment>Duree de conservation des evenements avant purge automatique.</comment>
+                </field>
+                <field id="purge_batch_size" translate="label comment" type="text" sortOrder="80" showInDefault="0" showInWebsite="0" showInStore="0">
+                    <label>Taille de lot de purge</label>
+                    <comment>Nombre d enregistrements supprimes par passe de purge.</comment>
+                </field>
+                <field id="cb_failure_threshold" translate="label comment" type="text" sortOrder="90" showInDefault="0" showInWebsite="0" showInStore="0">
+                    <label>Seuil d echec du circuit breaker</label>
+                    <comment>Nombre d echecs consecutifs avant ouverture du circuit.</comment>
+                </field>
+                <field id="cb_cooldown_seconds" translate="label comment" type="text" sortOrder="100" showInDefault="0" showInWebsite="0" showInStore="0">
+                    <label>Cooldown du circuit breaker (secondes)</label>
+                    <comment>Temps d attente avant une nouvelle tentative apres ouverture du circuit.</comment>
+                </field>
+            </group>
+
+            <group id="monitoring" translate="label comment" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
+                <label>Sante et monitoring</label>
+                <field id="monitoring_panel" translate="label comment" type="note" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Vue de sante</label>
+                    <comment>Resume de la file, des erreurs et des derniers runs cron pour cette boutique.</comment>
+                    <frontend_model>NeuroCheckout\Connector\Block\Adminhtml\System\Config\MonitoringPanel</frontend_model>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

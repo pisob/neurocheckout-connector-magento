@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Webapi:etc/webapi.xsd">
+    <route url="/V1/neurocheckout/coupon" method="POST">
+        <service class="NeuroCheckout\Connector\Api\CouponManagementInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <route url="/V1/neurocheckout/cartrestore" method="POST">
+        <service class="NeuroCheckout\Connector\Api\CartRestoreManagementInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <route url="/V1/neurocheckout/apikeysync" method="POST">
+        <service class="NeuroCheckout\Connector\Api\ApiKeySyncManagementInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <route url="/V1/neurocheckout/apitest" method="POST">
+        <service class="NeuroCheckout\Connector\Api\ApiTestManagementInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <route url="/V1/neurocheckout/orders/history" method="POST">
+        <service class="NeuroCheckout\Connector\Api\OrderHistoryManagementInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <route url="/V1/neurocheckout/orderhistory" method="POST">
+        <service class="NeuroCheckout\Connector\Api\OrderHistoryManagementInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <route url="/V1/neurocheckout/support/case" method="POST">
+        <service class="NeuroCheckout\Connector\Api\SupportCaseManagementInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <route url="/V1/neurocheckout/support/ticket" method="POST">
+        <service class="NeuroCheckout\Connector\Api\SupportCaseManagementInterface" method="execute"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+</routes>

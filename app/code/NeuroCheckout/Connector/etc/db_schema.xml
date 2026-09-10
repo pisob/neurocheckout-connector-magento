@@ -1,0 +1,291 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="neurocheckout_event" resource="default" engine="innodb" comment="NeuroCheckout Cart Event Queue">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="cart_id" nullable="false" length="64" comment="Cart ID"/>
+        <column xsi:type="varchar" name="event_hash" nullable="false" length="64" default="" comment="Event Hash"/>
+        <column xsi:type="mediumtext" name="payload" nullable="false" comment="Payload"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="pending" comment="Status"/>
+        <column xsi:type="smallint" name="attempts" nullable="false" unsigned="true" default="0" comment="Attempts"/>
+        <column xsi:type="datetime" name="next_retry_at" nullable="true" comment="Next Retry"/>
+        <column xsi:type="smallint" name="priority" nullable="false" unsigned="true" default="0" comment="Priority"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="datetime" name="last_attempt_at" nullable="true" comment="Last Attempt"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_EVENT_STORE_CART_UNQ">
+            <column name="store_id"/>
+            <column name="cart_id"/>
+        </constraint>
+        <index referenceId="NC_EVENT_DISPATCH_IDX" indexType="btree">
+            <column name="status"/>
+            <column name="priority"/>
+            <column name="created_at"/>
+        </index>
+        <index referenceId="NC_EVENT_RETRY_IDX" indexType="btree">
+            <column name="status"/>
+            <column name="next_retry_at"/>
+        </index>
+    </table>
+
+    <table name="neurocheckout_order_event" resource="default" engine="innodb" comment="NeuroCheckout Order Event Queue">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="order_id" nullable="false" length="64" comment="Order ID"/>
+        <column xsi:type="varchar" name="cart_id" nullable="false" length="64" comment="Cart ID"/>
+        <column xsi:type="mediumtext" name="payload" nullable="false" comment="Payload"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="pending" comment="Status"/>
+        <column xsi:type="smallint" name="attempts" nullable="false" unsigned="true" default="0" comment="Attempts"/>
+        <column xsi:type="datetime" name="next_retry_at" nullable="true" comment="Next Retry"/>
+        <column xsi:type="datetime" name="last_attempt_at" nullable="true" comment="Last Attempt"/>
+        <column xsi:type="varchar" name="last_error" nullable="true" length="255" comment="Last Error"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <column xsi:type="datetime" name="sent_at" nullable="true" comment="Sent At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_ORDER_EVENT_STORE_ORDER_UNQ">
+            <column name="store_id"/>
+            <column name="order_id"/>
+        </constraint>
+        <index referenceId="NC_ORDER_EVENT_DISPATCH_IDX" indexType="btree">
+            <column name="status"/>
+            <column name="next_retry_at"/>
+            <column name="created_at"/>
+        </index>
+    </table>
+
+    <table name="neurocheckout_telemetry_event" resource="default" engine="innodb" comment="NeuroCheckout Business Alert Telemetry Queue">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="event_id" nullable="false" length="120" comment="Event ID"/>
+        <column xsi:type="varchar" name="event_type" nullable="false" length="120" comment="Event Type"/>
+        <column xsi:type="varchar" name="cart_id" nullable="true" length="64" comment="Cart ID"/>
+        <column xsi:type="varchar" name="event_hash" nullable="false" length="64" comment="Event Hash"/>
+        <column xsi:type="mediumtext" name="payload" nullable="false" comment="Payload"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="pending" comment="Status"/>
+        <column xsi:type="smallint" name="attempts" nullable="false" unsigned="true" default="0" comment="Attempts"/>
+        <column xsi:type="datetime" name="next_retry_at" nullable="true" comment="Next Retry"/>
+        <column xsi:type="datetime" name="last_attempt_at" nullable="true" comment="Last Attempt"/>
+        <column xsi:type="varchar" name="last_error" nullable="true" length="255" comment="Last Error"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <column xsi:type="datetime" name="sent_at" nullable="true" comment="Sent At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_TELEMETRY_STORE_EVENT_UNQ">
+            <column name="store_id"/>
+            <column name="event_id"/>
+        </constraint>
+        <index referenceId="NC_TELEMETRY_DISPATCH_IDX" indexType="btree">
+            <column name="store_id"/>
+            <column name="status"/>
+            <column name="next_retry_at"/>
+            <column name="created_at"/>
+        </index>
+        <index referenceId="NC_TELEMETRY_TYPE_IDX" indexType="btree">
+            <column name="event_type"/>
+            <column name="created_at"/>
+        </index>
+        <index referenceId="NC_TELEMETRY_CART_IDX" indexType="btree">
+            <column name="store_id"/>
+            <column name="cart_id"/>
+            <column name="created_at"/>
+        </index>
+    </table>
+
+    <table name="neurocheckout_customer_journey_event" resource="default" engine="innodb" comment="NeuroCheckout Customer Journey Audit Queue">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="event_id" nullable="false" length="120" comment="Event ID"/>
+        <column xsi:type="varchar" name="event_type" nullable="false" length="140" comment="Event Type"/>
+        <column xsi:type="varchar" name="visitor_id" nullable="true" length="80" comment="Visitor ID"/>
+        <column xsi:type="varchar" name="session_id" nullable="true" length="80" comment="Session ID"/>
+        <column xsi:type="varchar" name="cart_id" nullable="true" length="64" comment="Cart ID"/>
+        <column xsi:type="varchar" name="customer_ref" nullable="true" length="120" comment="Customer Reference"/>
+        <column xsi:type="varchar" name="event_hash" nullable="false" length="64" comment="Event Hash"/>
+        <column xsi:type="mediumtext" name="payload" nullable="false" comment="Payload"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" default="pending" comment="Status"/>
+        <column xsi:type="smallint" name="attempts" nullable="false" unsigned="true" default="0" comment="Attempts"/>
+        <column xsi:type="datetime" name="next_retry_at" nullable="true" comment="Next Retry"/>
+        <column xsi:type="datetime" name="last_attempt_at" nullable="true" comment="Last Attempt"/>
+        <column xsi:type="varchar" name="last_error" nullable="true" length="255" comment="Last Error"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <column xsi:type="datetime" name="sent_at" nullable="true" comment="Sent At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_CJOURNEY_STORE_EVENT_UNQ">
+            <column name="store_id"/>
+            <column name="event_id"/>
+        </constraint>
+        <index referenceId="NC_CJOURNEY_DISPATCH_IDX" indexType="btree">
+            <column name="store_id"/>
+            <column name="status"/>
+            <column name="next_retry_at"/>
+            <column name="created_at"/>
+        </index>
+        <index referenceId="NC_CJOURNEY_TYPE_IDX" indexType="btree">
+            <column name="event_type"/>
+            <column name="created_at"/>
+        </index>
+        <index referenceId="NC_CJOURNEY_CART_IDX" indexType="btree">
+            <column name="store_id"/>
+            <column name="cart_id"/>
+            <column name="created_at"/>
+        </index>
+        <index referenceId="NC_CJOURNEY_VISITOR_IDX" indexType="btree">
+            <column name="store_id"/>
+            <column name="visitor_id"/>
+            <column name="created_at"/>
+        </index>
+    </table>
+
+    <table name="neurocheckout_cron_log" resource="default" engine="innodb" comment="NeuroCheckout Cron Log">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="timestamp" name="executed_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Executed At"/>
+        <column xsi:type="varchar" name="status" nullable="false" length="16" comment="Status"/>
+        <column xsi:type="int" name="processed_events" nullable="false" unsigned="true" default="0" comment="Processed Events"/>
+        <column xsi:type="int" name="execution_time_ms" nullable="false" unsigned="true" default="0" comment="Execution Time (ms)"/>
+        <column xsi:type="varchar" name="ip_address" nullable="true" length="45" comment="IP Address"/>
+        <column xsi:type="varchar" name="error_message" nullable="true" length="255" comment="Error Message"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <index referenceId="NC_CRON_LOG_STORE_EXECUTED_IDX" indexType="btree">
+            <column name="store_id"/>
+            <column name="executed_at"/>
+        </index>
+    </table>
+
+    <table name="neurocheckout_nonce" resource="default" engine="innodb" comment="NeuroCheckout Request Nonce">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="nonce" nullable="false" length="80" comment="Nonce"/>
+        <column xsi:type="int" name="expires_at" nullable="false" unsigned="true" comment="Expires At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_NONCE_UNQ">
+            <column name="store_id"/>
+            <column name="nonce"/>
+        </constraint>
+        <index referenceId="NC_NONCE_EXPIRES_IDX" indexType="btree">
+            <column name="expires_at"/>
+        </index>
+    </table>
+
+    <table name="neurocheckout_circuit_breaker" resource="default" engine="innodb" comment="NeuroCheckout Circuit Breaker">
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="state" nullable="false" length="16" default="closed" comment="State"/>
+        <column xsi:type="int" name="failure_count" nullable="false" unsigned="true" default="0" comment="Failure Count"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="store_id"/>
+        </constraint>
+    </table>
+
+    <table name="neurocheckout_coupon" resource="default" engine="innodb" comment="NeuroCheckout Coupon Map">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="request_uid" nullable="false" length="120" comment="Request UID"/>
+        <column xsi:type="varchar" name="decision_id" nullable="false" length="64" default="" comment="Decision ID"/>
+        <column xsi:type="varchar" name="action_id" nullable="true" length="64" comment="Action ID"/>
+        <column xsi:type="varchar" name="cart_id" nullable="false" length="64" comment="Cart ID"/>
+        <column xsi:type="varchar" name="customer_email" nullable="false" length="255" comment="Customer Email"/>
+        <column xsi:type="int" name="rule_id" nullable="false" unsigned="true" default="0" comment="Sales Rule ID"/>
+        <column xsi:type="varchar" name="coupon_code" nullable="false" length="64" comment="Coupon Code"/>
+        <column xsi:type="decimal" name="discount_percent" nullable="false" scale="2" precision="5" default="0.00" comment="Discount Percent"/>
+        <column xsi:type="varchar" name="cart_fingerprint" nullable="true" length="64" comment="Cart Fingerprint"/>
+        <column xsi:type="text" name="recovery_url" nullable="true" comment="Recovery URL"/>
+        <column xsi:type="datetime" name="expires_at" nullable="true" comment="Expires At"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_COUPON_STORE_REQUEST_UNQ">
+            <column name="store_id"/>
+            <column name="request_uid"/>
+        </constraint>
+        <index referenceId="NC_COUPON_STORE_DECISION_IDX" indexType="btree">
+            <column name="store_id"/>
+            <column name="decision_id"/>
+        </index>
+    </table>
+
+    <table name="neurocheckout_recovery_token" resource="default" engine="innodb" comment="NeuroCheckout Recovery Tokens">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="token_hash" nullable="false" length="64" comment="Token Hash"/>
+        <column xsi:type="varchar" name="cart_id" nullable="false" length="64" comment="Cart ID"/>
+        <column xsi:type="varchar" name="customer_email" nullable="false" length="255" comment="Customer Email"/>
+        <column xsi:type="varchar" name="coupon_code" nullable="true" length="64" comment="Coupon Code"/>
+        <column xsi:type="varchar" name="cart_fingerprint" nullable="true" length="64" comment="Cart Fingerprint"/>
+        <column xsi:type="varchar" name="mode" nullable="false" length="32" default="cart" comment="Recovery Mode"/>
+        <column xsi:type="int" name="customer_id" nullable="true" unsigned="true" comment="Customer ID"/>
+        <column xsi:type="text" name="target_url" nullable="true" comment="Target URL"/>
+        <column xsi:type="datetime" name="expires_at" nullable="false" comment="Expires At"/>
+        <column xsi:type="datetime" name="used_at" nullable="true" comment="Used At"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_RECOVERY_TOKEN_HASH_UNQ">
+            <column name="token_hash"/>
+        </constraint>
+        <index referenceId="NC_RECOVERY_TOKEN_STORE_EXPIRES_IDX" indexType="btree">
+            <column name="store_id"/>
+            <column name="expires_at"/>
+        </index>
+    </table>
+
+    <table name="neurocheckout_payload_alias" resource="default" engine="innodb" comment="NeuroCheckout Payload Aliases">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="original_key" nullable="false" length="100" comment="Original Key"/>
+        <column xsi:type="varchar" name="alias_key" nullable="false" length="20" comment="Alias Key"/>
+        <column xsi:type="smallint" name="schema_version" nullable="false" unsigned="true" default="1" comment="Schema Version"/>
+        <column xsi:type="timestamp" name="created_at" nullable="false" default="CURRENT_TIMESTAMP" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_ALIAS_STORE_ORIGINAL_UNQ">
+            <column name="store_id"/>
+            <column name="original_key"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_ALIAS_STORE_ALIAS_UNQ">
+            <column name="store_id"/>
+            <column name="alias_key"/>
+        </constraint>
+    </table>
+
+    <table name="neurocheckout_security_rate_limit" resource="default" engine="innodb" comment="NeuroCheckout Security Rate Limits">
+        <column xsi:type="int" name="id" nullable="false" identity="true" unsigned="true" comment="ID"/>
+        <column xsi:type="smallint" name="store_id" nullable="false" unsigned="true" default="0" comment="Store ID"/>
+        <column xsi:type="varchar" name="endpoint" nullable="false" length="32" comment="Endpoint"/>
+        <column xsi:type="varchar" name="client_ip" nullable="false" length="64" comment="Client IP"/>
+        <column xsi:type="int" name="attempt_count" nullable="false" unsigned="true" default="0" comment="Attempt Count"/>
+        <column xsi:type="datetime" name="window_started_at" nullable="false" comment="Window Started At"/>
+        <column xsi:type="datetime" name="blocked_until" nullable="true" comment="Blocked Until"/>
+        <column xsi:type="varchar" name="last_error" nullable="true" length="255" comment="Last Error"/>
+        <column xsi:type="timestamp" name="updated_at" nullable="false" default="CURRENT_TIMESTAMP" on_update="true" comment="Updated At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="NC_RATE_LIMIT_SCOPE_UNQ">
+            <column name="store_id"/>
+            <column name="endpoint"/>
+            <column name="client_ip"/>
+        </constraint>
+        <index referenceId="NC_RATE_LIMIT_BLOCKED_IDX" indexType="btree">
+            <column name="blocked_until"/>
+        </index>
+    </table>
+</schema>

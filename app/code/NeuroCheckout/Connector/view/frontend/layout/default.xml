@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="before.body.end">
+            <block class="NeuroCheckout\Connector\Block\Telemetry"
+                   name="neurocheckout.checkout.telemetry"
+                   template="NeuroCheckout_Connector::telemetry.phtml"/>
+            <block class="NeuroCheckout\Connector\Block\CustomerJourney"
+                   name="neurocheckout.customer.journey"
+                   template="NeuroCheckout_Connector::customer_journey.phtml"/>
+        </referenceContainer>
+    </body>
+</page>

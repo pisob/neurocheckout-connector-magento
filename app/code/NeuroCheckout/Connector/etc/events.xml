@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="checkout_cart_product_add_after">
+        <observer name="neurocheckout_queue_cart_add"
+                  instance="NeuroCheckout\Connector\Observer\QueueCartMutationObserver"/>
+    </event>
+    <event name="checkout_cart_update_items_after">
+        <observer name="neurocheckout_queue_cart_update"
+                  instance="NeuroCheckout\Connector\Observer\QueueCartMutationObserver"/>
+    </event>
+    <event name="sales_quote_remove_item">
+        <observer name="neurocheckout_queue_cart_remove"
+                  instance="NeuroCheckout\Connector\Observer\QueueCartMutationObserver"/>
+    </event>
+    <event name="sales_quote_collect_totals_before">
+        <observer name="neurocheckout_validate_recovery_coupon"
+                  instance="NeuroCheckout\Connector\Observer\ValidateNeuroCouponObserver"/>
+    </event>
+    <event name="sales_quote_collect_totals_after">
+        <observer name="neurocheckout_queue_checkout_telemetry"
+                  instance="NeuroCheckout\Connector\Observer\QueueCheckoutTelemetryObserver"/>
+    </event>
+    <event name="sales_order_place_after">
+        <observer name="neurocheckout_queue_order_completed"
+                  instance="NeuroCheckout\Connector\Observer\QueueOrderCompletedObserver"/>
+    </event>
+    <event name="sales_model_service_quote_submit_success">
+        <observer name="neurocheckout_queue_order_completed_after_submit"
+                  instance="NeuroCheckout\Connector\Observer\QueueOrderCompletedObserver"/>
+    </event>
+    <event name="sales_order_save_after">
+        <observer name="neurocheckout_queue_payment_telemetry"
+                  instance="NeuroCheckout\Connector\Observer\QueuePaymentTelemetryObserver"/>
+    </event>
+</config>
