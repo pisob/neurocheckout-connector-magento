@@ -25,6 +25,10 @@ class Config
     public const XML_PATH_API_TEST_VALIDATION_FINGERPRINT = 'neurocheckoutconnector/general/api_test_validation_fingerprint';
     public const XML_PATH_INTERNAL_SECRET = 'neurocheckoutconnector/general/internal_secret';
     public const XML_PATH_OPAQUE_RECOVERY_LINKS = 'neurocheckoutconnector/general/opaque_recovery_links';
+    public const XML_PATH_UPDATE_CHECKED_AT = 'neurocheckoutconnector/update/checked_at';
+    public const XML_PATH_UPDATE_STATUS = 'neurocheckoutconnector/update/status';
+    public const XML_PATH_UPDATE_LATEST_VERSION = 'neurocheckoutconnector/update/latest_version';
+    public const XML_PATH_UPDATE_RELEASE_URL = 'neurocheckoutconnector/update/release_url';
 
     public const XML_PATH_RECOVERY_ENABLED = 'neurocheckoutconnector/ia/recovery_enabled';
     public const XML_PATH_ENABLE_DISCOUNT = 'neurocheckoutconnector/ia/enable_discount';

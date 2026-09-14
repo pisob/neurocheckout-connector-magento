@@ -11,6 +11,7 @@ use Psr\Log\LoggerInterface;
 
 class SecureHttpClient
 {
+    public const CONNECTOR_VERSION = '1.0.1';
     private const DEFAULT_TIMEOUT = 8;
     private const CONNECT_TIMEOUT = 5;
     private const ORDER_TIMEOUT = 2;
@@ -84,6 +85,36 @@ class SecureHttpClient
         }
 
         return $lastResult;
+    }
+
+    public function checkConnectorVersion(int $storeId): array
+    {
+        $endpoint = rtrim($this->config->getString(Config::XML_PATH_API_ENDPOINT, $storeId), '/');
+        $candidates = $this->resolveApiKeyCandidatesForRequest($storeId);
+        if ($endpoint === '' || !$candidates || !filter_var($endpoint, FILTER_VALIDATE_URL)) {
+            return $this->errorResponse(0, 'API configuration missing');
+        }
+        $body = json_encode([
+            'platform' => 'magento',
+            'connector_version' => self::CONNECTOR_VERSION,
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $timestamp = (string) time();
+        $nonce = bin2hex(random_bytes(16));
+        $key = (string) $candidates[0]['key'];
+        return $this->executeWithRetry(
+            $endpoint . '/api/v1/connectors/version-check',
+            $body,
+            [
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $key,
+                'X-Neuro-Timestamp' => $timestamp,
+                'X-Neuro-Nonce' => $nonce,
+                'X-Neuro-Signature' => hash_hmac('sha256', $timestamp . '.' . $nonce . '.' . $body, $key),
+                'X-Neuro-Version' => '7',
+            ],
+            self::DEFAULT_TIMEOUT,
+            self::CONNECT_TIMEOUT
+        );
     }
 
     /**

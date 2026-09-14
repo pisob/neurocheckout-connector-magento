@@ -7,5 +7,10 @@
              method="execute">
             <schedule>*/1 * * * *</schedule>
         </job>
+        <job name="neurocheckout_connector_check_version"
+             instance="NeuroCheckout\Connector\Cron\CheckConnectorVersion"
+             method="execute">
+            <schedule>17 3 * * *</schedule>
+        </job>
     </group>
 </config>

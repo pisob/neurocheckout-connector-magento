@@ -36,6 +36,18 @@ Never publish connector keys, customer records, cart contents or configuration
 exports in an issue or pull request. Back up the store before uninstalling or
 upgrading the module.
 
+## Updates
+
+The daily Magento cron sends the installed connector version through the
+existing authenticated Cloud connection. When an update is available, the
+connector monitoring panel links to the exact official GitHub release. The
+Cloud cannot download or install code on the Magento server.
+
+Back up the store and update the existing Composer package in place. Then run
+Magento's module upgrade, dependency compilation and cache-cleaning commands.
+Do not disable or remove the module first: the in-place process preserves its
+configuration and database tables.
+
 ## Development
 
 The Magento module source is located in `app/code/NeuroCheckout/Connector/`.
