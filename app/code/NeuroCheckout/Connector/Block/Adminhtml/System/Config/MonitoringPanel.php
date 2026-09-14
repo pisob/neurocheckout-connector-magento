@@ -11,6 +11,7 @@ use NeuroCheckout\Connector\Model\Monitoring\HealthMonitor;
 use NeuroCheckout\Connector\Model\Repository\CronLogRepository;
 use NeuroCheckout\Connector\Model\Repository\RequestRateLimitRepository;
 use NeuroCheckout\Connector\Model\Repository\RecoveryAuditRepository;
+use NeuroCheckout\Connector\Model\Config;
 
 class MonitoringPanel extends Field
 {
@@ -19,6 +20,7 @@ class MonitoringPanel extends Field
     private CronLogRepository $cronLogRepository;
     private RecoveryAuditRepository $recoveryAuditRepository;
     private RequestRateLimitRepository $requestRateLimitRepository;
+    private Config $connectorConfig;
 
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
@@ -27,6 +29,7 @@ class MonitoringPanel extends Field
         CronLogRepository $cronLogRepository,
         RecoveryAuditRepository $recoveryAuditRepository,
         RequestRateLimitRepository $requestRateLimitRepository,
+        Config $connectorConfig,
         array $data = []
     ) {
         parent::__construct($context, $data);
@@ -35,6 +38,7 @@ class MonitoringPanel extends Field
         $this->cronLogRepository = $cronLogRepository;
         $this->recoveryAuditRepository = $recoveryAuditRepository;
         $this->requestRateLimitRepository = $requestRateLimitRepository;
+        $this->connectorConfig = $connectorConfig;
     }
 
     protected function _getElementHtml(AbstractElement $element): string
@@ -54,6 +58,7 @@ class MonitoringPanel extends Field
         };
 
         $html = '<div style="display:flex;flex-direction:column;gap:14px;">';
+        $html .= $this->renderConnectorUpdate($storeId);
         $html .= '<div style="padding:14px;border-radius:10px;border:1px solid #dbe4f0;background:#ffffff;">';
         $html .= '<div style="margin-bottom:12px;"><span style="display:inline-block;padding:6px 12px;border-radius:999px;color:#fff;background:' . $healthColor . ';font-weight:700;">'
             . strtoupper($this->escapeHtml($this->translateHealthStatus((string) ($health['status'] ?? 'unknown'))))
@@ -162,6 +167,21 @@ class MonitoringPanel extends Field
         $html .= '</div>';
 
         return $html;
+    }
+
+    private function renderConnectorUpdate(int $storeId): string
+    {
+        $status = $this->connectorConfig->getString(Config::XML_PATH_UPDATE_STATUS, $storeId);
+        if (!in_array($status, ['available', 'required', 'blocked'], true)) {
+            return '';
+        }
+        $latest = $this->escapeHtml($this->connectorConfig->getString(Config::XML_PATH_UPDATE_LATEST_VERSION, $storeId));
+        $url = $this->connectorConfig->getString(Config::XML_PATH_UPDATE_RELEASE_URL, $storeId);
+        $color = $status === 'available' ? '#b76b00' : '#b92c28';
+        return '<div style="padding:14px;border:1px solid ' . $color . ';background:#fff;border-radius:8px;">'
+            . '<strong>NeuroCheckout Connector ' . $latest . ' is available.</strong> '
+            . 'Back up the store, download the official release and update the existing Composer package. Do not remove the module; configuration and data are preserved. '
+            . '<a href="' . $this->escapeUrl($url) . '" target="_blank" rel="noopener noreferrer">Download official update</a></div>';
     }
 
     private function renderMetric(string $label, string $value, string $valueColor = '#1f2947'): string
