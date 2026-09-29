@@ -14,6 +14,8 @@ use Magento\Store\Model\StoreManagerInterface;
 use NeuroCheckout\Connector\Community\SourcePullGateway;
 use NeuroCheckout\Connector\Community\ReconciledSourceExporter;
 use NeuroCheckout\Connector\Community\MagentoSourceSnapshotFactory;
+use NeuroCheckout\Connector\Community\AutomaticSourceBinding;
+use NeuroCheckout\Connector\Model\Config;
 
 /** Raw JSON preserves the exact bytes covered by the response HMAC. */
 final class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
@@ -22,14 +24,16 @@ final class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
     private RawFactory $rawFactory;
     private StoreManagerInterface $storeManager;
     private MagentoSourceSnapshotFactory $sourceSnapshots;
+    private Config $config;
 
     public function __construct(RequestInterface $request, RawFactory $rawFactory, StoreManagerInterface $storeManager,
-        MagentoSourceSnapshotFactory $sourceSnapshots)
+        MagentoSourceSnapshotFactory $sourceSnapshots, Config $config)
     {
         $this->request = $request;
         $this->rawFactory = $rawFactory;
         $this->storeManager = $storeManager;
         $this->sourceSnapshots = $sourceSnapshots;
+        $this->config = $config;
     }
 
     public function execute(): Raw
@@ -37,6 +41,22 @@ final class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
         // Never accept a store ID supplied in the JSON body.
         try { $scope = (int) $this->storeManager->getStore()->getId(); }
         catch (\Throwable $error) { $scope = 0; }
+        $automatic = null;
+        try {
+            if ($scope > 0
+                && rtrim($this->config->getString(Config::XML_PATH_API_ENDPOINT, $scope), '/') === 'https://community-api-staging.neurocheckout.com'
+                && $this->config->isApiTestValidationCurrent($scope)) {
+                $shopId = $this->config->getString(Config::XML_PATH_SHOP_EXTERNAL_ID, $scope);
+                $automatic = ['enabled' => true, 'environment' => 'staging', 'nativeScope' => $scope,
+                    'platform' => 'magento', 'shopId' => $shopId,
+                    'secret' => AutomaticSourceBinding::secret($this->config->getNormalizedApiKey($scope), $shopId)];
+            }
+        } catch (\Throwable $error) {
+            return $this->rawFactory->create()->setHttpResponseCode(503)
+                ->setHeader('Content-Type', 'application/json', true)
+                ->setHeader('Cache-Control', 'no-store', true)
+                ->setContents('{"error":"source_unavailable"}');
+        }
         [$status, $headers, $body] = SourcePullGateway::handle(
             'magento', $scope, BP, (string) $this->request->getMethod(),
             (string) ($_SERVER['REQUEST_URI'] ?? ''), SourcePullGateway::serverHeaders($_SERVER),
@@ -45,7 +65,7 @@ final class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
                 return (new ReconciledSourceExporter($directory, $configuration, function () use ($scope): array {
                     return $this->sourceSnapshots->create()->capture($scope);
                 }))->page($input);
-            }
+            }, $automatic, BP . '/var/neurocheckout-community-source/' . $scope
         );
         $result = $this->rawFactory->create();
         $result->setHttpResponseCode($status);
