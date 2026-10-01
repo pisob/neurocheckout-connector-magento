@@ -13,6 +13,6 @@ for p in files:
         result = subprocess.run(["php", "-l", str(p)], capture_output=True, text=True, timeout=30)
         if result.returncode:
             sys.exit(result.stdout + result.stderr)
-for test in ["tests/automatic_binding_test.php", "tests/security_boundaries.php"]:
+for test in ["tests/automatic_binding_test.php", "tests/security_boundaries.php", "tests/controller_compatibility_test.php", "tests/api_connection_test.php", "tests/scheduler_health_test.php"]:
     subprocess.run(["php", str(root / test)], cwd=root, check=True, timeout=60)
 print("All PHP files linted; isolated tests passed. Real platform integration is not covered.")

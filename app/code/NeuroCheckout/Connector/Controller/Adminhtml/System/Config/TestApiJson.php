@@ -61,7 +61,7 @@ class TestApiJson extends Action
 
         try {
             $health = $this->httpClient->health([
-                'source' => ['shop_id' => $shopRef],
+                'source' => ['shop_id' => $shopRef, 'store_id' => $effectiveStoreId],
             ]);
             $isApiReady = true;
             $isIaReady = true;

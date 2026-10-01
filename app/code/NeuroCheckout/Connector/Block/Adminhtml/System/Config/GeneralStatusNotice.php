@@ -72,6 +72,16 @@ class GeneralStatusNotice extends Field
             $html .= '<br><small>' . $this->escapeHtml((string) __('Derniere validation: %1', $validatedAtDisplay)) . '</small>';
         }
         $html .= '</div>';
+        if ($apiGateReady && \NeuroCheckout\Connector\Model\Monitoring\SchedulerHealth::needsAttention(
+            $this->config->getInt(Config::XML_PATH_LAST_RUN, $storeId),
+            $validatedAt,
+            $this->config->getInt(Config::XML_PATH_CRON_INTERVAL_SECONDS, $storeId),
+            time()
+        )) {
+            $html .= '<div class="message message-warning">'
+                . $this->escapeHtml((string) __('No recent connector queue run was detected. Check Magento cron or your configured connector server cron. API validation alone does not start background synchronization.'))
+                . '</div>';
+        }
         $html .= '</div>';
 
         return $html;

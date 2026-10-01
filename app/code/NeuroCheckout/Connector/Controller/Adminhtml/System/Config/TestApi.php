@@ -52,7 +52,7 @@ class TestApi extends Action
             }
 
             $health = $this->httpClient->health([
-                'source' => ['shop_id' => $shopRef],
+                'source' => ['shop_id' => $shopRef, 'store_id' => $effectiveStoreId],
             ]);
             $isIaReady = true;
             $healthOk = !empty($health['success']);
