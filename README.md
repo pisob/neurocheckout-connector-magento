@@ -32,6 +32,25 @@ origin and integrity.
 8. Keep NeuroCheckout Community online when using encrypted local product and
    cart storage.
 
+Use the **NeuroCheckout API endpoint** supplied by your account, not your shop
+URL or its ngrok tunnel. The connection test validates an authenticated API
+response; an HTTP 200 HTML page is not a successful API connection.
+
+### Background synchronization
+
+API validation authorizes synchronization but does not install a scheduler.
+In automatic mode, ensure Magento's system cron is installed and running as the
+Magento filesystem owner (`php bin/magento cron:install`). In manual server-cron
+mode, schedule the connector command shown in the Execution tab:
+`php bin/magento neurocheckout:connector:cron-run --store-id=YOUR_STORE_ID`.
+Use the interval shown there and the correct Magento working directory. Choose
+one scheduling mode, and do not use `--force` for routine execution.
+
+After validation, check that **Last execution** advances and pending cart and
+Journey events drain. The General tab warns when no recent connector run has
+been detected; allow the initial scheduling grace period before diagnosing a
+new installation. Updating the module does not configure operating-system cron.
+
 Never publish connector keys, customer records, cart contents or configuration
 exports in an issue or pull request. Back up the store before uninstalling or
 upgrading the module.

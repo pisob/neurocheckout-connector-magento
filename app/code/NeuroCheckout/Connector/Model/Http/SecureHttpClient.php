@@ -11,7 +11,7 @@ use Psr\Log\LoggerInterface;
 
 class SecureHttpClient
 {
-    public const CONNECTOR_VERSION = '1.0.1';
+    public const CONNECTOR_VERSION = '1.0.2';
     private const DEFAULT_TIMEOUT = 8;
     private const CONNECT_TIMEOUT = 5;
     private const ORDER_TIMEOUT = 2;
@@ -300,34 +300,16 @@ class SecureHttpClient
     public function health(array $payload = []): array
     {
         $storeId = $this->extractStoreId($payload);
-        $endpoint = rtrim($this->config->getString(Config::XML_PATH_API_ENDPOINT, $storeId), '/');
-        $apiKey = $this->config->getNormalizedApiKey($storeId);
-
-        if ($endpoint === '' || $apiKey === '') {
-            return $this->errorResponse(0, 'API configuration missing');
+        $result = $this->checkConnectorVersion($storeId);
+        if (empty($result['success'])) {
+            return $result;
         }
-
-        $curl = $this->curlFactory->create();
-        $curl->setTimeout(10);
-        $curl->setHeaders([
-            'Content-Type' => 'application/json',
-            'X-API-Key' => $apiKey,
-        ]);
-
-        try {
-            $curl->get($endpoint . '/');
-            $status = (int)$curl->getStatus();
-            $body = (string)$curl->getBody();
-
-            return [
-                'success' => $status >= 200 && $status < 300,
-                'status' => $status,
-                'body' => $body,
-                'error' => null,
-            ];
-        } catch (\Throwable $e) {
-            return $this->errorResponse(0, $e->getMessage());
+        $data = json_decode((string) ($result['body'] ?? ''), true);
+        if (!is_array($data) || ($data['platform'] ?? null) !== 'magento'
+            || ($data['installed_version'] ?? null) !== self::CONNECTOR_VERSION) {
+            return $this->errorResponse((int) ($result['status'] ?? 0), 'Unexpected API response. Check the NeuroCheckout API endpoint.');
         }
+        return $result;
     }
 
     /**

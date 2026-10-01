@@ -18,7 +18,7 @@ use NeuroCheckout\Connector\Community\AutomaticSourceBinding;
 use NeuroCheckout\Connector\Model\Config;
 
 /** Raw JSON preserves the exact bytes covered by the response HMAC. */
-final class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
+class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
 {
     private RequestInterface $request;
     private RawFactory $rawFactory;
