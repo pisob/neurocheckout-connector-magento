@@ -122,7 +122,11 @@ namespace {
         };
         checkMagento($reader->capture(1)[1]['payload']['status'] === 'active', 'Concurrent order does not mix snapshot versions');
         checkMagento($reader->capture(1)[1]['payload']['status'] === 'converted', 'Next snapshot sees concurrent order');
-        $connectionConfig = ['host' => $socket, 'dbname' => $database, 'username' => 'root', 'password' => '', 'model' => 'mysql4', 'active' => '1', 'initStatements' => 'SET NAMES utf8;'];
+        $connectionConfig = ['host' => $socket, 'dbname' => $database, 'username' => 'root', 'password' => '', 'model' => 'mysql4', 'active' => '1', 'initStatements' => 'SET NAMES utf8;', 'driver_options' => [PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false]];
+        foreach ([true, false] as $verify) {
+            checkMagento(MagentoSourceSnapshotFactory::connectionOptions(['driver_options' => [PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => $verify]])[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] === $verify, 'Explicit TLS verification option preserved');
+        }
+        rejectMagento(static function () { MagentoSourceSnapshotFactory::connectionOptions(['driver_options' => [PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => 'false']]); }, 'source_schema_unavailable');
         if ($nativeSdk !== null) {
             $deployment = new \Magento\Framework\App\DeploymentConfig(
                 new \Magento\Framework\App\DeploymentConfig\Reader(
@@ -197,8 +201,36 @@ namespace {
         rejectMagento(static function () use ($reader) { $reader->capture(1); }, 'source_snapshot_not_transactional');
         $writer->exec('ALTER TABLE mg_catalog_category_product ENGINE=InnoDB');
         for ($id = 10; $id < 270; $id++) { $writer->exec("INSERT INTO mg_quote SELECT $id,store_id,is_active,customer_id,customer_is_guest,customer_email,customer_firstname,customer_lastname,created_at,updated_at,base_currency_code,quote_currency_code,grand_total,subtotal,subtotal_with_discount FROM mg_quote WHERE entity_id=1"); }
+        checkMagento(count($reader->capture(1)) === 262, 'More than 256 records exported without truncation');
+        for ($id = 100; $id < 2145; $id++) {
+            $writer->exec("INSERT INTO mg_catalog_product_entity VALUES ($id,'SKU-$id','simple',4,NOW(),NOW())");
+            $writer->exec("INSERT INTO mg_catalog_product_website VALUES ($id,1)");
+            foreach (['varchar', 'int', 'decimal', 'text'] as $type) {
+                $writer->exec("INSERT INTO mg_catalog_product_entity_$type(entity_id,attribute_id,store_id,value) SELECT $id,attribute_id,store_id,value FROM mg_catalog_product_entity_$type WHERE entity_id=10");
+            }
+        }
+        checkMagento(count($reader->capture(1)) === 2307, 'Large catalogue read in bounded batches');
+        $input['cursor'] = $deleted['nextCursor'];
+        $large = $call($input);
+        checkMagento(count($large['records']) === 8 && !$large['complete'], 'Large snapshot reconciled and paginated, not falsely complete');
+        $pageCount = 1; $sawCart = false;
+        while (!$large['complete'] && $pageCount < 400) {
+            foreach ($large['records'] as $record) { if ($record['kind'] === 'cart') $sawCart = true; }
+            $input['cursor'] = $large['nextCursor'];
+            // Exercise reconciliation directly here; gateway rate limiting is
+            // tested separately and deliberately caps authenticated requests.
+            $large = (new ReconciledSourceExporter($directory, $config, static function () use ($factory): array {
+                return $factory->create()->capture(1);
+            }))->page($input); $pageCount++;
+        }
+        checkMagento($large['complete'] && $sawCart, 'Large synchronization reaches carts and a fresh complete snapshot');
+        $writer->exec('INSERT INTO mg_quote SELECT entity_id+10000,store_id,is_active,customer_id,customer_is_guest,customer_email,customer_firstname,customer_lastname,created_at,updated_at,base_currency_code,quote_currency_code,grand_total,subtotal,subtotal_with_discount FROM mg_quote');
+        $writer->exec('INSERT INTO mg_quote SELECT entity_id+20000,store_id,is_active,customer_id,customer_is_guest,customer_email,customer_firstname,customer_lastname,created_at,updated_at,base_currency_code,quote_currency_code,grand_total,subtotal,subtotal_with_discount FROM mg_quote');
+        $writer->exec('INSERT INTO mg_quote SELECT entity_id+40000,store_id,is_active,customer_id,customer_is_guest,customer_email,customer_firstname,customer_lastname,created_at,updated_at,base_currency_code,quote_currency_code,grand_total,subtotal,subtotal_with_discount FROM mg_quote');
+        $writer->exec('INSERT INTO mg_quote SELECT entity_id+80000,store_id,is_active,customer_id,customer_is_guest,customer_email,customer_firstname,customer_lastname,created_at,updated_at,base_currency_code,quote_currency_code,grand_total,subtotal,subtotal_with_discount FROM mg_quote');
+        $writer->exec('INSERT INTO mg_quote SELECT entity_id+160000,store_id,is_active,customer_id,customer_is_guest,customer_email,customer_firstname,customer_lastname,created_at,updated_at,base_currency_code,quote_currency_code,grand_total,subtotal,subtotal_with_discount FROM mg_quote');
         rejectMagento(static function () use ($reader) { $reader->capture(1); }, 'source_snapshot_capacity');
-        checkMagento(!$readerPDO->inTransaction(), 'Transactions closed after failures');
+        checkMagento(!$readerPDO->inTransaction(), 'Transactions closed after capture');
         if (in_array('--pages-json', $argv, true)) { echo json_encode(['assertions' => $checks, 'pages' => $wirePages], JSON_THROW_ON_ERROR); }
         else { echo $checks . " Magento native SQL/factory assertions passed (synthetic schema).\n"; }
     } finally {

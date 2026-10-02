@@ -9,9 +9,9 @@ use RuntimeException;
 /** Bounded staging reconciliation, not a native database change-log cursor. */
 final class ReconciledSourceExporter
 {
-    private const MAX_STATE_BYTES = 8388608;
-    private const MAX_RECORDS = 256;
-    private const MAX_REFERENCES = 4096;
+    private const MAX_STATE_BYTES = 33554432;
+    private const MAX_RECORDS = 8192;
+    private const MAX_REFERENCES = 32768;
     private string $base;
     private string $key;
     private string $binding;
