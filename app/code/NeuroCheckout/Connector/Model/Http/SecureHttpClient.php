@@ -11,7 +11,7 @@ use Psr\Log\LoggerInterface;
 
 class SecureHttpClient
 {
-    public const CONNECTOR_VERSION = '1.0.2';
+    public const CONNECTOR_VERSION = '1.0.3';
     private const DEFAULT_TIMEOUT = 8;
     private const CONNECT_TIMEOUT = 5;
     private const ORDER_TIMEOUT = 2;
