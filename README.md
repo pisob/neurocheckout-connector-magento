@@ -5,6 +5,12 @@ authenticated store events to NeuroCheckout Cloud and supports signed,
 read-only product and cart snapshots for the encrypted local vault in
 NeuroCheckout Community.
 
+The staging snapshot exporter reads product attributes in bounded batches and
+supports up to 8,192 combined product/cart records per snapshot. It fails explicitly
+above this limit rather than silently omitting records. The first synchronization
+is paginated in eight-record responses; a large catalogue or slow tunnel can take
+time to finish. Store-scoped data and database consistency checks remain enforced.
+
 ## Availability
 
 Installable packages are published on the repository's

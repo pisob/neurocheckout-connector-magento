@@ -12,6 +12,9 @@ final class MagentoSourceSnapshot
     private PDO $db;
     private string $prefix;
     private float $started = 0;
+    private array $batchValues = [];
+    private array $batchChildren = [];
+    private array $batchCategories = [];
     private const TABLES = ['store', 'store_website', 'catalog_product_entity', 'catalog_product_website',
         'eav_entity_type', 'eav_attribute', 'catalog_eav_attribute', 'catalog_product_entity_varchar',
         'catalog_product_entity_int', 'catalog_product_entity_decimal', 'catalog_product_entity_text',
@@ -48,25 +51,26 @@ final class MagentoSourceSnapshot
             $attributes = $this->attributes();
             $products = $this->rows('SELECT p.entity_id, p.sku, p.type_id, p.attribute_set_id, p.created_at, p.updated_at FROM '
                 . $this->table('catalog_product_entity') . ' p JOIN ' . $this->table('catalog_product_website')
-                . ' pw ON pw.product_id=p.entity_id WHERE pw.website_id=? ORDER BY p.entity_id', [$website], 256);
+                . ' pw ON pw.product_id=p.entity_id WHERE pw.website_id=? ORDER BY p.entity_id', [$website], 8192);
             $quotes = $this->rows('SELECT entity_id, store_id, is_active, customer_id, customer_is_guest, customer_email,
                 customer_firstname, customer_lastname, created_at, updated_at, base_currency_code, quote_currency_code,
-                grand_total, subtotal, subtotal_with_discount FROM ' . $this->table('quote') . ' WHERE store_id=? ORDER BY entity_id', [$scope], 256);
-            if (count($products) + count($quotes) > 256) { throw new RuntimeException('source_snapshot_capacity'); }
+                grand_total, subtotal, subtotal_with_discount FROM ' . $this->table('quote') . ' WHERE store_id=? ORDER BY entity_id', [$scope], 8192);
+            if (count($products) + count($quotes) > 8192) { throw new RuntimeException('source_snapshot_capacity'); }
             $result = [];
-            foreach ($products as $product) {
+            foreach (array_chunk($products, 128) as $batch) {
+              $this->prepareProductBatch($batch, $scope, $website, $attributes);
+              foreach ($batch as $product) {
                 $id = (int) $product['entity_id'];
                 $product['store_id'] = $scope; $product['website_id'] = $website;
                 $product['attributes'] = $this->values($id, $scope, $attributes);
-                $product['children'] = $this->rows('SELECT r.child_id FROM ' . $this->table('catalog_product_relation')
-                    . ' r JOIN ' . $this->table('catalog_product_website')
-                    . ' pw ON pw.product_id=r.child_id WHERE r.parent_id=? AND pw.website_id=? ORDER BY r.child_id', [$id, $website], 128);
-                $product['category_ids'] = $this->rows('SELECT category_id FROM ' . $this->table('catalog_category_product')
-                    . ' WHERE product_id=? ORDER BY category_id', [$id], 128);
+                $product['children'] = $this->batchChildren[$id] ?? [];
+                $product['category_ids'] = $this->batchCategories[$id] ?? [];
+                if (count($product['children']) > 128 || count($product['category_ids']) > 128) { throw new RuntimeException('source_snapshot_capacity'); }
                 // MSI salable quantities require reservations and website stock
                 // resolution; do not mislabel a legacy/global quantity as stock.
                 $product['inventory_status'] = 'not_exported';
                 $result[] = $this->record('product', $id, $product);
+              }
             }
             foreach ($quotes as $quote) {
                 $id = (int) $quote['entity_id'];
@@ -120,14 +124,8 @@ final class MagentoSourceSnapshot
             $byId[(int) $attribute['attribute_id']] = $attribute['attribute_code'];
             $result[$attribute['attribute_code']] = ['scope' => (int) $attribute['is_global'], 'default' => null, 'store' => null, 'effective' => null];
         }
-        $queries = []; $parameters = [];
-        foreach ($types as $type => $ids) {
-            $queries[] = 'SELECT attribute_id, store_id, LEFT(CAST(value AS CHAR),16385) AS value FROM '
-                . $this->table('catalog_product_entity_' . $type) . ' WHERE entity_id=? AND store_id IN (0,?) AND attribute_id IN ('
-                . implode(',', array_fill(0, count($ids), '?')) . ')';
-            $parameters = array_merge($parameters, [$product, $scope], $ids);
-        }
-        $values = $this->rows('SELECT * FROM (' . implode(' UNION ALL ', $queries) . ') v ORDER BY attribute_id,store_id', $parameters, 2 * count($attributes));
+        $values = $this->batchValues[$product] ?? [];
+        if (count($values) > 2 * count($attributes)) { throw new RuntimeException('source_snapshot_capacity'); }
         $seen = [];
         foreach ($values as $value) {
             $key = $value['attribute_id'] . ':' . $value['store_id'];
@@ -143,6 +141,29 @@ final class MagentoSourceSnapshot
         if ($result['name']['effective'] === null || $result['status']['effective'] === null
             || $result['visibility']['effective'] === null) { throw new RuntimeException('source_schema_unavailable'); }
         return $result;
+    }
+
+    private function prepareProductBatch(array $products, int $scope, int $website, array $attributes): void
+    {
+        $this->batchValues = []; $this->batchChildren = []; $this->batchCategories = [];
+        $ids = array_map(static function ($p) { return (int) $p['entity_id']; }, $products);
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $types = [];
+        foreach ($attributes as $attribute) { $types[$attribute['backend_type']][] = (int) $attribute['attribute_id']; }
+        foreach ($types as $type => $attributeIds) {
+            $rows = $this->rows('SELECT entity_id, attribute_id, store_id, LEFT(CAST(value AS CHAR),16385) AS value FROM '
+                . $this->table('catalog_product_entity_' . $type) . ' WHERE entity_id IN (' . $marks . ') AND store_id IN (0,?) AND attribute_id IN ('
+                . implode(',', array_fill(0, count($attributeIds), '?')) . ') ORDER BY entity_id,attribute_id,store_id',
+                array_merge($ids, [$scope], $attributeIds), count($ids) * count($attributeIds) * 2);
+            foreach ($rows as $row) { $this->batchValues[(int) $row['entity_id']][] = $row; }
+        }
+        $rows = $this->rows('SELECT r.parent_id,r.child_id FROM ' . $this->table('catalog_product_relation')
+            . ' r JOIN ' . $this->table('catalog_product_website') . ' pw ON pw.product_id=r.child_id WHERE r.parent_id IN ('
+            . $marks . ') AND pw.website_id=? ORDER BY r.parent_id,r.child_id', array_merge($ids, [$website]), count($ids) * 128);
+        foreach ($rows as $row) { $this->batchChildren[(int) $row['parent_id']][] = ['child_id' => $row['child_id']]; }
+        $rows = $this->rows('SELECT product_id,category_id FROM ' . $this->table('catalog_category_product')
+            . ' WHERE product_id IN (' . $marks . ') ORDER BY product_id,category_id', $ids, count($ids) * 128);
+        foreach ($rows as $row) { $this->batchCategories[(int) $row['product_id']][] = ['category_id' => $row['category_id']]; }
     }
 
     private function validateSchema(): void

@@ -33,8 +33,7 @@ final class MagentoSourceSnapshotFactory
             throw new RuntimeException('source_schema_unavailable');
         }
         [$dsn, $username, $password] = self::connectionParameters($config);
-        $connection = new PDO($dsn, $username, $password, [PDO::ATTR_TIMEOUT => 2,
-            PDO::MYSQL_ATTR_MULTI_STATEMENTS => false, PDO::ATTR_PERSISTENT => false]);
+        $connection = new PDO($dsn, $username, $password, self::connectionOptions($config));
         return new MagentoSourceSnapshot($connection, $prefix);
     }
 
@@ -47,13 +46,14 @@ final class MagentoSourceSnapshotFactory
             }
         }
         if (!preg_match('/^[A-Za-z0-9_$-]+$/D', $config['dbname']) || $config['username'] === ''
-            || !empty($config['driver_options']) || !empty($config['ssl']) || !empty($config['unix_socket'])
+            || !empty($config['ssl']) || !empty($config['unix_socket'])
             || (isset($config['active']) && (string) $config['active'] !== '1')
             || (isset($config['model']) && $config['model'] !== 'mysql4')
             || (!empty($config['initStatements']) && !preg_match('/^SET NAMES utf8(?:mb4)?;?$/iD', $config['initStatements']))) {
             // In particular, never silently discard TLS/custom driver options.
             throw new RuntimeException('source_schema_unavailable');
         }
+        self::connectionOptions($config);
         $host = $config['host'];
         if (preg_match('#^/[A-Za-z0-9_./-]+$#D', $host)) {
             if (isset($config['port'])) { throw new RuntimeException('source_schema_unavailable'); }
@@ -67,5 +67,19 @@ final class MagentoSourceSnapshotFactory
             $target = 'host=' . $parts[1] . ';port=' . $port;
         } else { throw new RuntimeException('source_schema_unavailable'); }
         return ['mysql:' . $target . ';dbname=' . $config['dbname'] . ';charset=utf8mb4', $config['username'], $config['password']];
+    }
+
+    /** Preserve explicitly supported native TLS options, never silently drop them. */
+    public static function connectionOptions(array $config): array
+    {
+        $options = $config['driver_options'] ?? [];
+        if (!is_array($options)) { throw new RuntimeException('source_schema_unavailable'); }
+        foreach ($options as $key => $value) {
+            if ((int) $key !== PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT || !is_bool($value)) {
+                throw new RuntimeException('source_schema_unavailable');
+            }
+        }
+        return $options + [PDO::ATTR_TIMEOUT => 2, PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
+            PDO::ATTR_PERSISTENT => false];
     }
 }
