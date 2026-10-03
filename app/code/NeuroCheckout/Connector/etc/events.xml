@@ -1,6 +1,10 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="controller_front_send_response_before">
+        <observer name="neurocheckout_traffic_cron"
+                  instance="NeuroCheckout\Connector\Observer\TrafficCronObserver"/>
+    </event>
     <event name="checkout_cart_product_add_after">
         <observer name="neurocheckout_queue_cart_add"
                   instance="NeuroCheckout\Connector\Observer\QueueCartMutationObserver"/>
