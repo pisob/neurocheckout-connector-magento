@@ -51,7 +51,7 @@ class CronExecutor
     /**
      * @return array<string, mixed>
      */
-    public function executeStore(int $storeId, bool $isCronTest = false, bool $isDebugForce = false): array
+    public function executeStore(int $storeId, bool $isCronTest = false, bool $isDebugForce = false, ?int $batchLimit = null): array
     {
         $started = microtime(true);
 
@@ -60,7 +60,7 @@ class CronExecutor
         }
 
         try {
-            $processed = $this->dispatcher->dispatch($storeId, 100, $isCronTest);
+            $processed = $this->dispatcher->dispatch($storeId, $batchLimit === null ? 100 : max(1, min(100, $batchLimit)), $isCronTest);
             $dispatchStats = $this->dispatcher->getLastRunStats();
             $cartFailures = (int) ($dispatchStats['failed'] ?? 0);
             $cleared = (int) ($dispatchStats['cleared'] ?? 0);
@@ -76,7 +76,7 @@ class CronExecutor
 
             if (!$isCronTest) {
                 $this->orderEventRepository->releaseStuckProcessing($storeId, $this->staleProcessingMinutes());
-                $pendingOrders = $this->orderEventRepository->lockBatchAtomic($storeId, 30);
+                $pendingOrders = $this->orderEventRepository->lockBatchAtomic($storeId, $batchLimit === null ? 30 : max(1, min(30, $batchLimit)));
                 foreach ($pendingOrders as $row) {
                     $rowId = (int) ($row['id'] ?? 0);
                     $attempts = (int) ($row['attempts'] ?? 0);
@@ -106,7 +106,7 @@ class CronExecutor
 
                 if ($this->config->isTelemetryEnabled($storeId)) {
                     $this->telemetryEventRepository->releaseStuckProcessing($storeId, 5);
-                    $pendingTelemetry = $this->telemetryEventRepository->lockBatchAtomic($storeId, 50);
+                    $pendingTelemetry = $this->telemetryEventRepository->lockBatchAtomic($storeId, $batchLimit === null ? 50 : max(1, min(50, $batchLimit)));
                     foreach ($pendingTelemetry as $row) {
                         $rowId = (int) ($row['id'] ?? 0);
                         $attempts = (int) ($row['attempts'] ?? 0);
@@ -139,7 +139,7 @@ class CronExecutor
 
                 if ($this->config->isCustomerJourneyEnabled($storeId)) {
                     $this->customerJourneyEventRepository->releaseStuckProcessing($storeId, 5);
-                    $pendingJourneyEvents = $this->customerJourneyEventRepository->lockBatchAtomic($storeId, 75);
+                    $pendingJourneyEvents = $this->customerJourneyEventRepository->lockBatchAtomic($storeId, $batchLimit === null ? 75 : max(1, min(75, $batchLimit)));
                     foreach ($pendingJourneyEvents as $row) {
                         $rowId = (int) ($row['id'] ?? 0);
                         $attempts = (int) ($row['attempts'] ?? 0);
@@ -338,7 +338,7 @@ class CronExecutor
         $lockFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'neurocheckout_connector_store_' . $storeId . '.lock';
         $handle = @fopen($lockFile, 'c');
         if ($handle === false) {
-            return true;
+            return false;
         }
 
         if (!@flock($handle, LOCK_EX | LOCK_NB)) {

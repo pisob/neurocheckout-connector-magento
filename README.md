@@ -45,6 +45,18 @@ response; an HTTP 200 HTML page is not a successful API connection.
 ### Background synchronization
 
 API validation authorizes synchronization but does not install a scheduler.
+The module includes a traffic-triggered fallback in automatic mode on PHP-FPM:
+after a Magento web response has finished, it processes at most one record per
+queue for the current store. It requires a successful, current API test and valid
+configuration, respects the configured interval (minimum 60 seconds), and shares
+the normal executor lock. Failures stay subject to the existing queue retry rules.
+No public cron URL, browser timer or ngrok loopback is required by this fallback.
+
+This fallback is included in both new installations and module updates; no
+computer-specific service is needed. It is **not a no-traffic scheduler**:
+full-page-cache hits, requests not reaching Magento, and non-FPM servers do not
+trigger it. Keep the standard Magento cron for reliable delivery without visits.
+
 In automatic mode, ensure Magento's system cron is installed and running as the
 Magento filesystem owner (`php bin/magento cron:install`). In manual server-cron
 mode, schedule the connector command shown in the Execution tab:
