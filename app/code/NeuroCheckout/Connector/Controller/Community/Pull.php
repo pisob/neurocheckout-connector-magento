@@ -43,11 +43,12 @@ class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
         catch (\Throwable $error) { $scope = 0; }
         $automatic = null;
         try {
+            $environment = AutomaticSourceBinding::environment($this->config->getString(Config::XML_PATH_API_ENDPOINT, $scope));
             if ($scope > 0
-                && rtrim($this->config->getString(Config::XML_PATH_API_ENDPOINT, $scope), '/') === 'https://community-api-staging.neurocheckout.com'
+                && $environment !== null
                 && $this->config->isApiTestValidationCurrent($scope)) {
                 $shopId = $this->config->getString(Config::XML_PATH_SHOP_EXTERNAL_ID, $scope);
-                $automatic = ['enabled' => true, 'environment' => 'staging', 'nativeScope' => $scope,
+                $automatic = ['enabled' => true, 'environment' => $environment, 'nativeScope' => $scope,
                     'platform' => 'magento', 'shopId' => $shopId,
                     'secret' => AutomaticSourceBinding::secret($this->config->getNormalizedApiKey($scope), $shopId)];
             }
