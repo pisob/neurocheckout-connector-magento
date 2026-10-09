@@ -110,6 +110,12 @@ namespace {
         checkMagento((int) $product['attributes']['status']['effective'] === 1, 'Global status ignores invalid per-view row');
         checkMagento(!$product['children'] && $product['inventory_status'] === 'not_exported', 'Foreign child excluded; no invented MSI quantity');
         checkMagento($cart['status'] === 'active' && (int) $cart['customer_is_guest'] === 1, 'Guest quote retained');
+        $writer->exec('UPDATE mg_quote SET customer_id=8, customer_is_guest=0 WHERE entity_id=1');
+        $registered = $reader->capture(1)[1]['payload'];
+        checkMagento((int) $registered['customer_id'] === 8 && (int) $registered['customer_is_guest'] === 0, 'Registered identity retained');
+        $writer->exec('UPDATE mg_quote SET customer_is_guest=1 WHERE entity_id=1');
+        checkMagento((int) $reader->capture(1)[1]['payload']['customer_is_guest'] === 1, 'Explicit guest flag survives positive customer ID');
+        $writer->exec('UPDATE mg_quote SET customer_id=NULL WHERE entity_id=1');
         checkMagento(strpos(json_encode($snapshot), 'other@example.invalid') === false && strpos(json_encode($snapshot), 'foreign@example.invalid') === false, 'No other view or website contacts');
         checkMagento($reader->capture(2)[1]['payload']['status'] === 'inactive', 'Inactive quote without order is not converted');
         rejectMagento(static function () use ($reader) { $reader->capture(4); }, 'source_shop_unavailable');

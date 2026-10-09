@@ -1,5 +1,13 @@
 # NeuroCheckout Connector for Magento
 
+## Customer identity in Community
+
+Native quote snapshots preserve both `customer_id` and `customer_is_guest`.
+Cloud requires a positive customer ID and an explicit non-guest flag before
+classifying a cart as registered. Missing or ambiguous values remain guests;
+an email address alone never overrides the merchant's guest-recovery policy.
+Regression coverage includes registered quotes and guests with customer IDs.
+
 This is the official open-source Magento connector for NeuroCheckout. It sends
 authenticated store events to NeuroCheckout Cloud and supports signed,
 read-only product and cart snapshots for the encrypted local vault in
