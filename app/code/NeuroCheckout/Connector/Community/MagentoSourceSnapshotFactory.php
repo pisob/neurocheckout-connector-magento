@@ -13,10 +13,12 @@ final class MagentoSourceSnapshotFactory
 {
     private DeploymentConfig $deployment;
     private ConfigInterface $resources;
+    private ProductPresentation $presentation;
 
-    public function __construct(DeploymentConfig $deployment, ConfigInterface $resources)
+    public function __construct(DeploymentConfig $deployment, ConfigInterface $resources, ProductPresentation $presentation)
     {
         $this->deployment = $deployment; $this->resources = $resources;
+        $this->presentation = $presentation;
     }
 
     public function create(): MagentoSourceSnapshot
@@ -34,7 +36,9 @@ final class MagentoSourceSnapshotFactory
         }
         [$dsn, $username, $password] = self::connectionParameters($config);
         $connection = new PDO($dsn, $username, $password, self::connectionOptions($config));
-        return new MagentoSourceSnapshot($connection, $prefix);
+        return new MagentoSourceSnapshot($connection, $prefix, function (int $scope): callable {
+            return $this->presentation->forStore($scope);
+        });
     }
 
     /** Pure validation, no connection. Never log the returned credentials. */

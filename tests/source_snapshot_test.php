@@ -35,7 +35,7 @@ namespace {
     use NeuroCheckout\Connector\Community\SourcePullGateway;
     use NeuroCheckout\Connector\Community\SourcePullProtocol;
     $base = dirname(__DIR__) . '/app/code/NeuroCheckout/Connector/Community/';
-    foreach (['MagentoSourceSnapshot', 'MagentoSourceSnapshotFactory', 'ReconciledSourceExporter', 'SourcePullGateway', 'SourcePullProtocol'] as $class) { require_once $base . $class . '.php'; }
+    foreach (['ProductPresentation', 'MagentoSourceSnapshot', 'MagentoSourceSnapshotFactory', 'ReconciledSourceExporter', 'SourcePullGateway', 'SourcePullProtocol'] as $class) { require_once $base . $class . '.php'; }
     $socket = $argv[1] ?? '';
     if (!preg_match('#^/tmp/nc-source-mariadb\.[A-Za-z0-9]+/mariadb\.sock$#D', $socket) || !file_exists($socket)) { exit(2); }
     $checks = 0;
@@ -144,10 +144,21 @@ namespace {
             $deployment = new \Magento\Framework\App\DeploymentConfig(['db/connection/default' => $connectionConfig, 'db/table_prefix' => 'mg_']);
         }
         $resources = new class implements \Magento\Framework\App\ResourceConnection\ConfigInterface { public function getConnectionName($name) { return 'default'; } };
-        $factory = new MagentoSourceSnapshotFactory($deployment, $resources);
+        $presentation = new class extends \NeuroCheckout\Connector\Community\ProductPresentation {
+            public function __construct() {}
+            public function forStore(int $scope): callable {
+                return static function (array $product) use ($scope): array {
+                    return ['image_url'=>'https://cdn.example.invalid/store-'.$scope.'/image-'.$product['entity_id'].'.jpg',
+                        'image_status'=>'available', 'product_url'=>'https://shop.example.invalid/view-'.$scope.'/product/'.$product['entity_id']];
+                };
+            }
+        };
+        $factory = new MagentoSourceSnapshotFactory($deployment, $resources, $presentation);
         checkMagento(count($factory->create()->capture(1)) === 2, 'Factory uses isolated runtime connection');
+        checkMagento($factory->create()->capture(1)[0]['payload']['image_url'] === 'https://cdn.example.invalid/store-1/image-10.jpg', 'Snapshot includes store scoped product media');
+        checkMagento($factory->create()->capture(2)[0]['payload']['product_url'] === 'https://shop.example.invalid/view-2/product/10', 'Product URL uses selected store');
         $split = new class implements \Magento\Framework\App\ResourceConnection\ConfigInterface { public function getConnectionName($name) { return $name; } };
-        rejectMagento(static function () use ($deployment, $split) { (new MagentoSourceSnapshotFactory($deployment, $split))->create(); }, 'source_schema_unavailable');
+        rejectMagento(static function () use ($deployment, $split, $presentation) { (new MagentoSourceSnapshotFactory($deployment, $split, $presentation))->create(); }, 'source_schema_unavailable');
         foreach ([['driver_options' => [1009 => '/private/test-ca']], ['host' => 'localhost;dbname=other'], ['dbname' => 'bad;database'], ['initStatements' => 'DELETE FROM quote'], ['port' => 3306], ['model' => 'other']] as $change) {
             rejectMagento(static function () use ($connectionConfig, $change) { MagentoSourceSnapshotFactory::connectionParameters(array_replace($connectionConfig, $change)); }, 'source_schema_unavailable');
         }
