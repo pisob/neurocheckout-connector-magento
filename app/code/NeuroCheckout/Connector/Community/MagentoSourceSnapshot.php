@@ -11,6 +11,7 @@ final class MagentoSourceSnapshot
 {
     private PDO $db;
     private string $prefix;
+    private $presentation;
     private float $started = 0;
     private array $batchValues = [];
     private array $batchChildren = [];
@@ -22,12 +23,13 @@ final class MagentoSourceSnapshot
     private const ATTRIBUTES = ['name', 'status', 'visibility', 'price', 'special_price', 'special_from_date',
         'special_to_date', 'tax_class_id', 'weight', 'url_key', 'short_description', 'image'];
 
-    public function __construct(PDO $connection, string $prefix)
+    public function __construct(PDO $connection, string $prefix, ?callable $presentation = null)
     {
         if (!preg_match('/^[A-Za-z0-9_]*$/D', $prefix) || $connection->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') {
             throw new RuntimeException('source_schema_unavailable');
         }
         $this->db = $connection; $this->prefix = $prefix;
+        $this->presentation = $presentation;
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         $this->db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
@@ -48,6 +50,7 @@ final class MagentoSourceSnapshot
                 . $this->table('store_website') . ' w ON w.website_id=s.website_id WHERE s.store_id=? AND s.is_active=1 AND s.website_id>0', [$scope], 1);
             if (count($stores) !== 1) { throw new RuntimeException('source_shop_unavailable'); }
             $website = (int) $stores[0]['website_id'];
+            $present = $this->presentation !== null ? ($this->presentation)($scope) : null;
             $attributes = $this->attributes();
             $products = $this->rows('SELECT p.entity_id, p.sku, p.type_id, p.attribute_set_id, p.created_at, p.updated_at FROM '
                 . $this->table('catalog_product_entity') . ' p JOIN ' . $this->table('catalog_product_website')
@@ -69,6 +72,7 @@ final class MagentoSourceSnapshot
                 // MSI salable quantities require reservations and website stock
                 // resolution; do not mislabel a legacy/global quantity as stock.
                 $product['inventory_status'] = 'not_exported';
+                if ($present !== null) { $product = array_merge($product, $present($product)); }
                 $result[] = $this->record('product', $id, $product);
               }
             }

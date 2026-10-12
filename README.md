@@ -1,5 +1,14 @@
 # NeuroCheckout Connector for Magento
 
+## Product details in Community emails
+
+Product snapshots include image and product URLs resolved for the selected store
+view. Images use Magento's configured media base (including a media CDN) and the
+actual product image path. Product IDs are never used as image identifiers.
+No image is invented for a product without an assigned image. Update in place,
+run Magento's normal upgrade/compilation steps, and let Community synchronize
+the new snapshot before testing a new email. Previously sent emails are unchanged.
+
 This is the official open-source Magento connector for NeuroCheckout. It sends
 authenticated store events to NeuroCheckout Cloud and supports signed,
 read-only product and cart snapshots for the encrypted local vault in
@@ -13,10 +22,10 @@ time to finish. Store-scoped data and database consistency checks remain enforce
 
 ## Availability
 
-Installable packages are published on the repository's
-[Releases page](https://github.com/pisob/neurocheckout-connector-magento/releases).
-If no release is listed, the repository contains development sources only and
-should not be installed by store operators.
+The current installable connector is **v1.0.6**:
+
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.6/neurocheckout-connector-magento-1.0.6.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.6).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
