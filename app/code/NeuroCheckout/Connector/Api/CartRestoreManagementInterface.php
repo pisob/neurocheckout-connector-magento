@@ -7,8 +7,8 @@ namespace NeuroCheckout\Connector\Api;
 interface CartRestoreManagementInterface
 {
     /**
-     * @param array<string, mixed> $payload
-     * @return array<string, mixed>
+     * @param mixed $payload JSON object; validated before any operation.
+     * @return mixed[]
      */
-    public function execute(array $payload = []): array;
+    public function execute($payload = []): array;
 }

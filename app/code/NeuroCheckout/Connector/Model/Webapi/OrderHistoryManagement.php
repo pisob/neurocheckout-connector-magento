@@ -52,10 +52,10 @@ class OrderHistoryManagement extends AbstractEndpoint implements OrderHistoryMan
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @return array<string, mixed>
+     * @param mixed $payload JSON object; validated before any operation.
+     * @return mixed[]
      */
-    public function execute(array $payload = []): array
+    public function execute($payload = []): array
     {
         try {
             try {
@@ -135,23 +135,23 @@ class OrderHistoryManagement extends AbstractEndpoint implements OrderHistoryMan
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param mixed $payload
      * @return array<string, mixed>
      */
-    private function normalizeHistoryPayload(array $payload): array
+    private function normalizeHistoryPayload($payload): array
     {
         $rawBody = $this->getRawBody();
         if ($rawBody === '') {
-            return $payload;
+            return $this->normalizeObjectPayload($payload);
         }
 
         $body = $this->decodeRequestBody($rawBody);
         $decoded = json_decode($body, true);
-        if (!is_array($decoded)) {
+        if (substr(ltrim($body), 0, 1) !== '{' || !is_array($decoded)) {
             throw new \RuntimeException('invalid_json_payload');
         }
 
-        return $decoded;
+        return $this->normalizeObjectPayload($decoded);
     }
 
     private function decodeRequestBody(string $rawBody): string
