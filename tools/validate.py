@@ -15,4 +15,5 @@ for p in files:
             sys.exit(result.stdout + result.stderr)
 for test in ["tests/product_presentation_test.php", "tests/automatic_binding_test.php", "tests/security_boundaries.php", "tests/controller_compatibility_test.php", "tests/api_connection_test.php", "tests/scheduler_health_test.php", "tests/traffic_cron_test.php", "tests/traffic_cron_observer_test.php"]:
     subprocess.run(["php", str(root / test)], cwd=root, check=True, timeout=60)
+subprocess.run(["php", str(root / "tests/recovery_safety_test.php")], cwd=root, check=True, timeout=60)
 print("All PHP files linted; isolated tests passed. Real platform integration is not covered.")

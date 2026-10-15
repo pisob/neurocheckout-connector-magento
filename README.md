@@ -98,6 +98,11 @@ configuration and database tables.
 
 The Magento module source is located in `app/code/NeuroCheckout/Connector/`.
 
+Recovery validation includes isolated controller scenarios for single-use token
+claims, expiry and customer/cart validation. A claim must succeed before any
+customer session or quote mutation. These tests do not replace a full checkout
+and Cloud attribution test on a supported Magento installation.
+
 ```bash
 python3 tools/validate.py
 ```
