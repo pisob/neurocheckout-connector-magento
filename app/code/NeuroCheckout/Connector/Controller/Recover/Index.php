@@ -81,13 +81,15 @@ class Index extends Action
                 $tokenTargetUrl = $this->sanitizeSameHostTargetUrl(trim((string) ($opaquePayload['target_url'] ?? '')));
                 $fallbackUrl = $this->recoveryLinkService->buildCartUrl(max(1, $storeId));
 
-                if (!$this->restoreCustomerSessionById($customerId, $email)) {
-                    $this->logger->warning('[NC] Recover link customer session restore failed for customer ' . $customerId);
+                // The preceding resolve is a read, not a claim. No session may
+                // be authenticated until this request wins the atomic claim.
+                if (!$this->recoveryLinkService->consumeOpaque($recoveryToken)) {
+                    $this->logger->warning('[NC] Recover link opaque token already consumed for customer ' . $customerId);
                     return $this->resultRedirectFactory->create()->setUrl($fallbackUrl);
                 }
 
-                if (!$this->recoveryLinkService->consumeOpaque($recoveryToken)) {
-                    $this->logger->warning('[NC] Recover link opaque token already consumed for customer ' . $customerId);
+                if (!$this->restoreCustomerSessionById($customerId, $email)) {
+                    $this->logger->warning('[NC] Recover link customer session restore failed for customer ' . $customerId);
                     return $this->resultRedirectFactory->create()->setUrl($fallbackUrl);
                 }
 
@@ -143,17 +145,18 @@ class Index extends Action
             return $this->resultRedirectFactory->create()->setUrl($fallbackUrl);
         }
 
+        // Claim before activating/saving a quote or modifying either session.
+        if ($recoveryToken !== '' && !$this->recoveryLinkService->consumeOpaque($recoveryToken)) {
+            $this->logger->warning('[NC] Recover link opaque token already consumed for cart ' . $cartId);
+            return $this->resultRedirectFactory->create()->setUrl($fallbackUrl);
+        }
+
         $quote->setIsActive(true);
         if ($couponCode !== '') {
             $quote->setCouponCode($couponCode);
             $quote->collectTotals();
         }
         $this->quoteRepository->save($quote);
-
-        if ($recoveryToken !== '' && !$this->recoveryLinkService->consumeOpaque($recoveryToken)) {
-            $this->logger->warning('[NC] Recover link opaque token already consumed for cart ' . $cartId);
-            return $this->resultRedirectFactory->create()->setUrl($fallbackUrl);
-        }
 
         $this->checkoutSession->replaceQuote($quote);
         $this->checkoutSession->setQuoteId((int) $quote->getId());
