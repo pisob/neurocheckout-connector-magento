@@ -22,25 +22,37 @@ abstract class AbstractEndpoint
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param mixed $payload
      * @return array<string, mixed>
      */
-    protected function normalizePayload(array $payload): array
+    protected function normalizePayload($payload): array
     {
         $rawBody = (string) $this->request->getContent();
         if ($rawBody !== '') {
-            $decoded = json_decode($rawBody, true);
-            if (is_array($decoded)) {
-                return $decoded;
+            if (substr(ltrim($rawBody), 0, 1) !== '{') {
+                throw new Exception(__('Invalid JSON payload'), 0, 422);
             }
-
-            throw new Exception(
-                __('Invalid JSON payload'),
-                0,
-                Exception::HTTP_UNPROCESSABLE_ENTITY
-            );
+            $decoded = json_decode($rawBody, true);
+            $payload = $decoded;
         }
+        return $this->normalizeObjectPayload($payload);
+    }
 
+    /** @param mixed $payload */
+    protected function normalizeObjectPayload($payload): array
+    {
+        if (!is_array($payload) || ($payload !== [] && array_is_list($payload))) {
+            throw new Exception(__('Invalid JSON payload'), 0, 422);
+        }
+        // Accept Magento's named service argument as well as the established
+        // flat connector protocol. Authentication still signs the exact raw body.
+        if (array_key_exists('payload', $payload)) {
+            if (count($payload) !== 1 || !is_array($payload['payload']) ||
+                ($payload['payload'] !== [] && array_is_list($payload['payload']))) {
+                throw new Exception(__('Invalid JSON payload'), 0, 422);
+            }
+            return $payload['payload'];
+        }
         return $payload;
     }
 

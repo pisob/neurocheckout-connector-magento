@@ -22,10 +22,10 @@ time to finish. Store-scoped data and database consistency checks remain enforce
 
 ## Availability
 
-The current installable connector is **v1.0.7**:
+The current installable connector is **v1.0.8**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.7/neurocheckout-connector-magento-1.0.7.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.7).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.8/neurocheckout-connector-magento-1.0.8.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.8).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their

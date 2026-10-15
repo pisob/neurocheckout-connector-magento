@@ -36,10 +36,10 @@ class ApiTestManagement extends AbstractEndpoint implements ApiTestManagementInt
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @return array<string, mixed>
+     * @param mixed $payload JSON object; validated before any operation.
+     * @return mixed[]
      */
-    public function execute(array $payload = []): array
+    public function execute($payload = []): array
     {
         try {
             $payload = $this->normalizePayload($payload);
