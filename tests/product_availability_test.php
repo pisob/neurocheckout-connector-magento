@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-namespace Magento\Store\Model { interface StoreManagerInterface { public function getStore($id); } }
+namespace Magento\Store\Model { interface StoreManagerInterface { public function getStore($id = null); } }
 namespace Magento\Framework { interface ObjectManagerInterface { public function get($type); } }
 namespace Magento\Framework\App {
     class DeploymentConfig {
@@ -31,7 +31,12 @@ namespace {
         $clock = (object) ['now' => 100.0];
         $stores = new class implements \Magento\Store\Model\StoreManagerInterface {
             public int $scope = 2; public int $website = 7; public bool $active = true; public array $requested = [];
-            public function getStore($id) { $this->requested[] = $id; return $this; }
+            public int $currentScope = 2;
+            public function getStore($id = null) {
+                $this->requested[] = $id;
+                if ($id === null) { $current = clone $this; $current->scope = $this->currentScope; return $current; }
+                return $this;
+            }
             public function getId() { return $this->scope; }
             public function getWebsiteId() { return $this->website; }
             public function isActive() { return $this->active; }
@@ -98,7 +103,7 @@ namespace {
     $result = $read([$product]);
     checkAvailability($result[1] === ['inventory_status' => 'website_salable', 'available_for_sale' => true,
         'inventory_scope' => ['store_id' => 2, 'website_id' => 7, 'stock_id' => 9, 'requested_qty' => 1]], 'exact bound evidence');
-    checkAvailability($f['stores']->requested === [2], 'explicit store view');
+    checkAvailability($f['stores']->requested[0] === 2 && in_array(null, $f['stores']->requested, true), 'explicit and current store view');
     checkAvailability($f['resolver']->calls === [['website', 'selected_website']], 'explicit website sales channel');
     $f['clock']->now += 0.1;
     checkAvailability($read([$product]) === $result, 'unchanged stock does not churn payload digest');
@@ -128,10 +133,11 @@ namespace {
         $r = $f['service']->forStore(2, 7)([$product]);
         checkAvailability(is_array($errors) ? !$r[1]['available_for_sale'] : $r === [], 'errors never grant');
     }
-    foreach (['scope', 'website', 'disabled', 'inactive', 'missing_msi', 'invalid_stock'] as $mode) {
+    foreach (['scope', 'website', 'current_scope', 'disabled', 'inactive', 'missing_msi', 'invalid_stock'] as $mode) {
         $f = inventoryFixture();
         if ($mode === 'scope') { $f['stores']->scope = 3; }
         if ($mode === 'website') { $f['stores']->website = 8; }
+        if ($mode === 'current_scope') { $f['stores']->currentScope = 3; }
         if ($mode === 'disabled') { $f['deployment']->enabled = 0; }
         if ($mode === 'inactive') { $f['stores']->active = false; }
         if ($mode === 'missing_msi') { $f['objects']->fail = true; }
@@ -139,6 +145,13 @@ namespace {
         checkAvailability($f['service']->forStore(2, 7)([$product]) === [], 'optional/scoped availability fails closed: ' . $mode);
         checkAvailability($f['indexed']->calls === 0 && $f['quantity']->calls === 0, 'no inventory call without valid scope');
         if ($mode === 'disabled') { checkAvailability($f['objects']->lookups === [], 'disabled MSI is not instantiated'); }
+    }
+    foreach (['before', 'indexed', 'quantity'] as $boundary) {
+        $f = inventoryFixture(); $read = $f['service']->forStore(2, 7);
+        if ($boundary === 'before') { $f['stores']->currentScope = 3; }
+        else { $f[$boundary]->mutate = static function ($rows) use ($f) { $f['stores']->currentScope = 3; return $rows; }; }
+        checkAvailability($read([$product]) === [], 'current store cannot change during native read');
+        if ($boundary !== 'quantity') { checkAvailability(!$f['quantity']->calls, 'foreign current scope prevents next read'); }
     }
     foreach (['configurable', 'bundle', 'grouped', 'unknown'] as $type) {
         $f = inventoryFixture(); $p = $product; $p['type_id'] = $type;

@@ -34,7 +34,8 @@ class ProductAvailability
                 throw new RuntimeException('inventory_unavailable');
             }
             $store = $this->stores->getStore($scope);
-            if ((int) $store->getId() !== $scope || (int) $store->getWebsiteId() !== $website || !$store->isActive()) {
+            if ((int) $store->getId() !== $scope || (int) $store->getWebsiteId() !== $website || !$store->isActive()
+                || !$this->currentScope($scope, $website)) {
                 throw new RuntimeException('inventory_unavailable');
             }
             // Resolve optional MSI only at authenticated capture time. A shop
@@ -53,6 +54,9 @@ class ProductAvailability
         return function (array $products) use ($scope, $website, $stockId, $salable, $quantity, $requests, $deadline): array {
             if (count($products) > 128 || ($this->clock)() >= $deadline) { return []; }
             try {
+                // Native inventory configuration also consults the current
+                // store. Never label another request context as this view.
+                if (!$this->currentScope($scope, $website)) { return []; }
                 $bySku = []; $requestList = [];
                 foreach ($products as $product) {
                     // Composite products require variant/option-aware pricing
@@ -72,11 +76,11 @@ class ProductAvailability
                 if (!$bySku || ($this->clock)() >= $deadline) { return []; }
                 $skus = array_map(static function ($key) { return substr($key, 4); }, array_keys($bySku));
                 $indexed = $this->results($salable->execute($skus, $stockId), $bySku, $stockId, false);
-                if (($this->clock)() >= $deadline) { return []; }
+                if (($this->clock)() >= $deadline || !$this->currentScope($scope, $website)) { return []; }
                 // Indexed is_salable alone is insufficient: pending orders may
                 // reserve the last unit before a stock index update occurs.
                 $requested = $this->results($quantity->execute($requestList, $stockId), $bySku, $stockId, true);
-                if (($this->clock)() >= $deadline) { return []; }
+                if (($this->clock)() >= $deadline || !$this->currentScope($scope, $website)) { return []; }
                 $result = [];
                 foreach ($bySku as $sku => $id) {
                     $result[$id] = ['inventory_status' => 'website_salable',
@@ -93,6 +97,12 @@ class ProductAvailability
                 return [];
             }
         };
+    }
+
+    private function currentScope(int $scope, int $website): bool
+    {
+        $current = $this->stores->getStore();
+        return (int) $current->getId() === $scope && (int) $current->getWebsiteId() === $website;
     }
 
     private function results(array $rows, array $expected, int $stockId, bool $withErrors): array

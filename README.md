@@ -24,6 +24,8 @@ Snapshots now use Magento's native MSI website stock resolver and both salabilit
 and requested-quantity checks for one unit. This includes reservations and native
 backorder policy; a legacy/global quantity or indexed in-stock flag alone does
 not suffice. Evidence is bound to the exact store view, website and stock.
+The current Magento request store must also match before, between and after the
+native calls, since stock configuration can depend on that context.
 Only enabled, individually visible simple, virtual and downloadable products are
 checked. Composite/custom product types remain unknown until their option-aware
 selection and pricing are supported. This is inventory evidence, not a guarantee
