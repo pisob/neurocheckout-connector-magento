@@ -13,7 +13,7 @@ for p in files:
         result = subprocess.run(["php", "-l", str(p)], capture_output=True, text=True, timeout=30)
         if result.returncode:
             sys.exit(result.stdout + result.stderr)
-for test in ["tests/product_presentation_test.php", "tests/automatic_binding_test.php", "tests/security_boundaries.php", "tests/controller_compatibility_test.php", "tests/api_connection_test.php", "tests/scheduler_health_test.php", "tests/traffic_cron_test.php", "tests/traffic_cron_observer_test.php"]:
+for test in ["tests/product_availability_test.php", "tests/product_presentation_test.php", "tests/automatic_binding_test.php", "tests/security_boundaries.php", "tests/controller_compatibility_test.php", "tests/api_connection_test.php", "tests/scheduler_health_test.php", "tests/traffic_cron_test.php", "tests/traffic_cron_observer_test.php"]:
     subprocess.run(["php", str(root / test)], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/recovery_safety_test.php")], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/webapi_payload_test.php")], cwd=root, check=True, timeout=60)

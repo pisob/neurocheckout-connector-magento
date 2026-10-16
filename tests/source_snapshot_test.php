@@ -35,7 +35,7 @@ namespace {
     use NeuroCheckout\Connector\Community\SourcePullGateway;
     use NeuroCheckout\Connector\Community\SourcePullProtocol;
     $base = dirname(__DIR__) . '/app/code/NeuroCheckout/Connector/Community/';
-    foreach (['ProductPresentation', 'MagentoSourceSnapshot', 'MagentoSourceSnapshotFactory', 'ReconciledSourceExporter', 'SourcePullGateway', 'SourcePullProtocol'] as $class) { require_once $base . $class . '.php'; }
+    foreach (['ProductPresentation', 'ProductAvailability', 'MagentoSourceSnapshot', 'MagentoSourceSnapshotFactory', 'ReconciledSourceExporter', 'SourcePullGateway', 'SourcePullProtocol'] as $class) { require_once $base . $class . '.php'; }
     $socket = $argv[1] ?? '';
     if (!preg_match('#^/tmp/nc-source-mariadb\.[A-Za-z0-9]+/mariadb\.sock$#D', $socket) || !file_exists($socket)) { exit(2); }
     $checks = 0;
@@ -188,6 +188,37 @@ namespace {
         checkMagento(count($factory->create()->capture(1)) === 2, 'Factory uses isolated runtime connection');
         checkMagento($factory->create()->capture(1)[0]['payload']['image_url'] === 'https://cdn.example.invalid/store-1/image-10.jpg', 'Snapshot includes store scoped product media');
         checkMagento($factory->create()->capture(2)[0]['payload']['product_url'] === 'https://shop.example.invalid/view-2/product/10', 'Product URL uses selected store');
+        $inventory = new class extends \NeuroCheckout\Connector\Community\ProductAvailability {
+            public string $mode = 'available'; public array $scopes = [];
+            public function __construct() {}
+            public function forStore(int $scope, int $website): callable {
+                $this->scopes[] = [$scope, $website];
+                if ($this->mode === 'init_failure') { throw new \RuntimeException('private init error'); }
+                return function (array $products) use ($scope, $website): array {
+                    if ($this->mode === 'read_failure') { throw new \RuntimeException('private read error'); }
+                    checkMagento(count($products) <= 128 && isset($products[0]['attributes']['status']), 'inventory receives bounded hydrated batch');
+                    return [$products[0]['entity_id'] => ['available_for_sale' => $this->mode !== 'denied',
+                        'inventory_status' => 'website_salable', 'price' => 9999,
+                        'inventory_scope' => ['store_id' => $scope, 'website_id' => $this->mode === 'foreign' ? 999 : $website,
+                            'stock_id' => 9, 'requested_qty' => 1]]];
+                };
+            }
+        };
+        $stockFactory = new MagentoSourceSnapshotFactory($deployment, $resources, $presentation, $inventory);
+        $stockSnapshot = $stockFactory->create()->capture(1);
+        checkMagento($stockSnapshot[0]['payload']['available_for_sale'] === true, 'native inventory injected through factory');
+        checkMagento($inventory->scopes === [[1,1]], 'native inventory receives exact store/website');
+        checkMagento(!isset($stockSnapshot[0]['payload']['price']), 'inventory cannot overwrite unrelated product fields');
+        checkMagento($stockFactory->create()->capture(1) === $stockSnapshot, 'stable inventory does not force endless source revisions');
+        $inventory->mode = 'denied';
+        checkMagento($stockFactory->create()->capture(1)[0]['payload']['available_for_sale'] === false, 'reservation/stock denial replaces previous grant');
+        foreach (['init_failure', 'read_failure', 'foreign'] as $mode) {
+            $inventory->mode = $mode; $unknown = $stockFactory->create()->capture(1);
+            checkMagento($unknown[0]['payload']['inventory_status'] === 'not_exported'
+                && !isset($unknown[0]['payload']['available_for_sale']), 'native failure or foreign evidence never grants');
+            checkMagento($unknown[1] === $stockSnapshot[1], 'optional inventory failure preserves cart');
+            checkMagento(strpos(json_encode($unknown), 'private') === false, 'native exceptions do not leak into source');
+        }
         $split = new class implements \Magento\Framework\App\ResourceConnection\ConfigInterface { public function getConnectionName($name) { return $name; } };
         rejectMagento(static function () use ($deployment, $split, $presentation) { (new MagentoSourceSnapshotFactory($deployment, $split, $presentation))->create(); }, 'source_schema_unavailable');
         foreach ([['driver_options' => [1009 => '/private/test-ca']], ['host' => 'localhost;dbname=other'], ['dbname' => 'bad;database'], ['initStatements' => 'DELETE FROM quote'], ['port' => 3306], ['model' => 'other']] as $change) {

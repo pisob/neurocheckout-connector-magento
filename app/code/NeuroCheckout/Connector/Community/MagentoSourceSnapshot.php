@@ -12,6 +12,7 @@ final class MagentoSourceSnapshot
     private PDO $db;
     private string $prefix;
     private $presentation;
+    private $inventory;
     private float $started = 0;
     private array $batchValues = [];
     private array $batchChildren = [];
@@ -25,13 +26,15 @@ final class MagentoSourceSnapshot
     private const ATTRIBUTES = ['name', 'status', 'visibility', 'price', 'special_price', 'special_from_date',
         'special_to_date', 'tax_class_id', 'weight', 'url_key', 'short_description', 'image'];
 
-    public function __construct(PDO $connection, string $prefix, ?callable $presentation = null, bool $newsletterEnabled = false)
+    public function __construct(PDO $connection, string $prefix, ?callable $presentation = null, bool $newsletterEnabled = false,
+        ?callable $inventory = null)
     {
         if (!preg_match('/^[A-Za-z0-9_]*$/D', $prefix) || $connection->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') {
             throw new RuntimeException('source_schema_unavailable');
         }
         $this->db = $connection; $this->prefix = $prefix;
         $this->presentation = $presentation;
+        $this->inventory = $inventory;
         $this->newsletterEnabled = $newsletterEnabled;
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
@@ -54,6 +57,9 @@ final class MagentoSourceSnapshot
             if (count($stores) !== 1) { throw new RuntimeException('source_shop_unavailable'); }
             $website = (int) $stores[0]['website_id'];
             $present = $this->presentation !== null ? ($this->presentation)($scope) : null;
+            $inventory = null;
+            try { if ($this->inventory !== null) { $inventory = ($this->inventory)($scope, $website); } }
+            catch (\Throwable $error) { /* Optional MSI outage must not break carts. */ }
             $attributes = $this->attributes();
             $products = $this->rows('SELECT p.entity_id, p.sku, p.type_id, p.attribute_set_id, p.created_at, p.updated_at FROM '
                 . $this->table('catalog_product_entity') . ' p JOIN ' . $this->table('catalog_product_website')
@@ -65,6 +71,7 @@ final class MagentoSourceSnapshot
             $result = [];
             foreach (array_chunk($products, 128) as $batch) {
               $this->prepareProductBatch($batch, $scope, $website, $attributes);
+              $prepared = [];
               foreach ($batch as $product) {
                 $id = (int) $product['entity_id'];
                 $product['store_id'] = $scope; $product['website_id'] = $website;
@@ -76,6 +83,24 @@ final class MagentoSourceSnapshot
                 // resolution; do not mislabel a legacy/global quantity as stock.
                 $product['inventory_status'] = 'not_exported';
                 if ($present !== null) { $product = array_merge($product, $present($product)); }
+                $prepared[] = $product;
+              }
+              $availability = [];
+              try { if (is_callable($inventory)) { $availability = $inventory($prepared); } }
+              catch (\Throwable $error) { /* Leave stock explicitly unknown. */ }
+              foreach ($prepared as $product) {
+                $id = (int) $product['entity_id'];
+                $evidence = is_array($availability) ? ($availability[$id] ?? null) : null;
+                $bound = is_array($evidence) ? ($evidence['inventory_scope'] ?? null) : null;
+                if (is_array($bound) && count($bound) === 4
+                    && ($bound['store_id'] ?? null) === $scope && ($bound['website_id'] ?? null) === $website
+                    && is_int($bound['stock_id'] ?? null) && $bound['stock_id'] > 0
+                    && ($bound['requested_qty'] ?? null) === 1 && ($evidence['inventory_status'] ?? '') === 'website_salable'
+                    && is_bool($evidence['available_for_sale'] ?? null)) {
+                    $product['inventory_status'] = 'website_salable';
+                    $product['available_for_sale'] = $evidence['available_for_sale'];
+                    $product['inventory_scope'] = $bound;
+                }
                 $result[] = $this->record('product', $id, $product);
               }
             }

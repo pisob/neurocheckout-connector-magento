@@ -18,6 +18,31 @@ before a recommendation email. This source change does not activate campaigns.
 Disposable native SQL tests cover these boundaries and retain checkout/snapshot
 regressions; real recommendation delivery remains a separate acceptance test.
 
+### Website stock evidence (candidate, not released)
+
+Snapshots now use Magento's native MSI website stock resolver and both salability
+and requested-quantity checks for one unit. This includes reservations and native
+backorder policy; a legacy/global quantity or indexed in-stock flag alone does
+not suffice. Evidence is bound to the exact store view, website and stock.
+Only enabled, individually visible simple, virtual and downloadable products are
+checked. Composite/custom product types remain unknown until their option-aware
+selection and pricing are supported. This is inventory evidence, not a guarantee
+that every customer can check out with the item.
+
+Optional or disabled MSI, native failures, foreign/duplicate/incomplete responses
+and expired reads leave inventory unknown without breaking normal cart records.
+Checks use at most 128 products per batch and a shared 1.5-second cooperative
+budget. A late native response is discarded; a synchronous service cannot be
+preempted. The existing five-second capture limit is unchanged. Freshness stays
+in the signed source envelope; timestamps are not added to product payloads, so
+unchanged stock does not cause perpetual resynchronization.
+
+This does **not** yet export a recipient/tax-aware final display price or activate
+recommendation campaigns. Raw EAV prices must not be advertised as final prices.
+Automated coverage includes native-service contract tests and disposable SQL
+factory/snapshot tests in CI. Local native read-only checks do not replace the
+remaining real recommendation-email and checkout acceptance tests.
+
 Product snapshots include image and product URLs resolved for the selected store
 view. Images use Magento's configured media base (including a media CDN) and the
 actual product image path. Product IDs are never used as image identifiers.

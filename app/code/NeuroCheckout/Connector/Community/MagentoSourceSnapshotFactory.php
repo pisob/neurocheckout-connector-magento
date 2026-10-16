@@ -14,11 +14,14 @@ final class MagentoSourceSnapshotFactory
     private DeploymentConfig $deployment;
     private ConfigInterface $resources;
     private ProductPresentation $presentation;
+    private ?ProductAvailability $inventory;
 
-    public function __construct(DeploymentConfig $deployment, ConfigInterface $resources, ProductPresentation $presentation)
+    public function __construct(DeploymentConfig $deployment, ConfigInterface $resources, ProductPresentation $presentation,
+        ?ProductAvailability $inventory = null)
     {
         $this->deployment = $deployment; $this->resources = $resources;
         $this->presentation = $presentation;
+        $this->inventory = $inventory;
     }
 
     public function create(): MagentoSourceSnapshot
@@ -38,7 +41,10 @@ final class MagentoSourceSnapshotFactory
         $connection = new PDO($dsn, $username, $password, self::connectionOptions($config));
         return new MagentoSourceSnapshot($connection, $prefix, function (int $scope): callable {
             return $this->presentation->forStore($scope);
-        }, (int) $this->deployment->get('modules/Magento_Newsletter', 0) === 1);
+        }, (int) $this->deployment->get('modules/Magento_Newsletter', 0) === 1,
+            $this->inventory === null ? null : function (int $scope, int $website): callable {
+                return $this->inventory->forStore($scope, $website);
+            });
     }
 
     /** Pure validation, no connection. Never log the returned credentials. */
