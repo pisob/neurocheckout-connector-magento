@@ -68,11 +68,20 @@ budget; late responses or current-store changes invalidate the whole result.
 Synchronous native calls cannot be preempted. Individual product failures remain
 explicitly unavailable, not a fabricated price.
 
-This class has **no public endpoint and is not yet connected to the encrypted
-relay or a sender**. Its result is transient, customer-bound data: do not log it,
-persist it as a global product price or reuse it for another recipient. Addresses
-are never returned. Authenticated transport, freshness binding and a final
-pre-send recheck remain required before use in recommendation emails.
+The candidate exposes this read through the existing authenticated
+`POST /neurocheckout/community/pull` source route (`customer_prices` operation),
+with a matching Community client. The request binds the shop, expected native
+store/website, customer ID/email, currency and product IDs. Magento's current
+store is authoritative; JSON cannot select another store. Existing HMAC, HTTPS,
+durable nonce and rate guards remain. The response binds the exact request hash,
+has a 15-second freshness window and a 16 KiB limit. Errors are unavailable, not
+empty successful reads. Source pagination remains compatible.
+
+The result is transient, customer-bound data: do not log it, persist it as a
+global product price or reuse it for another recipient. Addresses are never
+returned. This is **not connected to a recommendation sender**: recipient-bound
+selection and final pre-send rechecks remain required. Installing this candidate
+alone does not activate independent recommendation emails.
 
 Verification: 287 isolated recipient-price assertions, the full connector
 validator, and read-only checks on the local native Magento installation.
@@ -81,6 +90,10 @@ two mandatory-option products and foreign-email/unsupported-currency requests
 were refused. Native checks ran in a read-only SQL transaction without changing
 installed source, customer preferences, orders or sending email. These checks
 do not certify third-party pricing extensions or a complete recommendation flow.
+The transport additionally passes 44 synthetic protocol assertions. A read-only
+native PHP/Community bridge verified two signed three-product reads, replay
+refusal and controller construction with real Magento services. It did not
+exercise a deployed HTTPS route or change the installed module.
 
 Product snapshots include image and product URLs resolved for the selected store
 view. Images use Magento's configured media base (including a media CDN) and the

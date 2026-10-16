@@ -15,6 +15,7 @@ use NeuroCheckout\Connector\Community\SourcePullGateway;
 use NeuroCheckout\Connector\Community\ReconciledSourceExporter;
 use NeuroCheckout\Connector\Community\MagentoSourceSnapshotFactory;
 use NeuroCheckout\Connector\Community\AutomaticSourceBinding;
+use NeuroCheckout\Connector\Community\CustomerProductPrices;
 use NeuroCheckout\Connector\Model\Config;
 
 /** Raw JSON preserves the exact bytes covered by the response HMAC. */
@@ -25,15 +26,17 @@ class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
     private StoreManagerInterface $storeManager;
     private MagentoSourceSnapshotFactory $sourceSnapshots;
     private Config $config;
+    private CustomerProductPrices $customerPrices;
 
     public function __construct(RequestInterface $request, RawFactory $rawFactory, StoreManagerInterface $storeManager,
-        MagentoSourceSnapshotFactory $sourceSnapshots, Config $config)
+        MagentoSourceSnapshotFactory $sourceSnapshots, Config $config, CustomerProductPrices $customerPrices)
     {
         $this->request = $request;
         $this->rawFactory = $rawFactory;
         $this->storeManager = $storeManager;
         $this->sourceSnapshots = $sourceSnapshots;
         $this->config = $config;
+        $this->customerPrices = $customerPrices;
     }
 
     public function execute(): Raw
@@ -58,11 +61,20 @@ class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
                 ->setHeader('Cache-Control', 'no-store', true)
                 ->setContents('{"error":"source_unavailable"}');
         }
+        $raw = SourcePullGateway::requestBody();
         [$status, $headers, $body] = SourcePullGateway::handle(
             'magento', $scope, BP, (string) $this->request->getMethod(),
             (string) ($_SERVER['REQUEST_URI'] ?? ''), SourcePullGateway::serverHeaders($_SERVER),
-            SourcePullGateway::requestBody(), (bool) $this->request->isSecure(),
-            function (array $input, int $scope, array $configuration, string $directory): array {
+            $raw, (bool) $this->request->isSecure(),
+            function (array $input, int $scope, array $configuration, string $directory) use ($raw): array {
+                if (($input['operation'] ?? null) === 'customer_prices') {
+                    // Scope is selected by Magento's request context, never by JSON.
+                    if ($input['storeId'] !== (string) $scope) { throw new \RuntimeException('source_invalid'); }
+                    return ['schema' => 1, 'shopId' => $configuration['shopId'], 'operation' => 'customer_prices',
+                        'requestHash' => hash('sha256', $raw),
+                        'prices' => $this->customerPrices->read($scope, (int) $input['customerId'],
+                            $input['customerEmail'], $input['productIds'], $input['currency'])];
+                }
                 return (new ReconciledSourceExporter($directory, $configuration, function () use ($scope): array {
                     return $this->sourceSnapshots->create()->capture($scope);
                 }))->page($input);

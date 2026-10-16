@@ -40,11 +40,18 @@ final class SourcePullGateway
                 static function (string $nonce, int $ttl) use ($statePath): bool {
                     return self::guard($statePath, $nonce, $ttl);
                 }, true, $configuration['environment']);
+            if (($input['operation'] ?? null) === 'customer_prices' && $input['storeId'] !== (string) $nativeScope) {
+                throw new RuntimeException('source_invalid');
+            }
             if ($exporter === null) {
                 return self::error(503, 'source_export_not_ready');
             }
             $page = $exporter($input, $nativeScope, $configuration, $directory);
-            self::validatePage($page, $input);
+            if (($input['operation'] ?? null) === 'customer_prices') {
+                CustomerPricesProtocol::response($page, $input, $nativeScope, $raw);
+            } else {
+                self::validatePage($page, $input);
+            }
             $body = json_encode($page, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             return [200, self::headers() + [
                 'X-NC-Source-Response' => SourcePullProtocol::responseSignature($configuration['secret'], $headers['x-nc-source-nonce'], $body),
