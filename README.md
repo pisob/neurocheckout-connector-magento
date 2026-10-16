@@ -95,6 +95,33 @@ native PHP/Community bridge verified two signed three-product reads, replay
 refusal and controller construction with real Magento services. It did not
 exercise a deployed HTTPS route or change the installed module.
 
+### Native account order history (candidate, not released)
+
+The signed source route also supports `customer_history` for an exact native
+store/website/customer ID and current account email. `CustomerOrderHistory` reads
+native sales tables directly, including orders whose original quote was removed.
+Other store views, other accounts and guest orders sharing an email are excluded.
+The account must be active and confirmed. A dedicated repeatable-read READ ONLY
+transaction keeps orders, lines, account and optional newsletter state consistent.
+It never modifies customers, orders, subscriptions or quotes.
+
+Native state/status, currency, paid/refunded amounts and line parent relations
+are returned as facts. Unknown paid amounts remain null; creation of an order is
+not proof of payment. No address, customer name or payment details are returned.
+Missing/disabled/ambiguous newsletter data remains unknown, never consent.
+Limits are 128 orders, 512 lines, 64,000 bytes of history and a three-second
+cooperative read budget. Required tables must support consistent transactions.
+Missing tables, drift, malformed data and overflow fail without partial success.
+HMAC, durable nonce/rate checks, request hash and 15-second freshness protect the
+response; existing source pagination is unchanged.
+
+The SQL/protocol suite includes 61 history assertions, concurrent payment updates,
+write refusal, foreign scope, duplicate/invalid lines, missing newsletter support
+and capacity failures. A read-only candidate bridge matched three local account
+orders against Magento's native order repository in two consistent signed reads,
+and refused replay. No installed module, consent or order was changed, and no
+email was sent. This is not live HTTPS or end-to-end recommendation acceptance.
+
 Product snapshots include image and product URLs resolved for the selected store
 view. Images use Magento's configured media base (including a media CDN) and the
 actual product image path. Product IDs are never used as image identifiers.

@@ -54,7 +54,10 @@ final class SourcePullProtocol
             throw new RuntimeException('source_unauthorized');
         }
         $input = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
-        if (is_array($input) && ($input['operation'] ?? null) === 'customer_prices') {
+        if (is_array($input) && ($input['operation'] ?? null) === 'customer_history') {
+            if (self::platformForPath($path) !== 'magento') { throw new RuntimeException('source_invalid'); }
+            CustomerHistoryProtocol::request($input, $shopId);
+        } elseif (is_array($input) && ($input['operation'] ?? null) === 'customer_prices') {
             if (self::platformForPath($path) !== 'magento') { throw new RuntimeException('source_invalid'); }
             CustomerPricesProtocol::request($input, $shopId);
         } elseif (!is_array($input) || !self::keys($input, ['schema', 'shopId', 'streamId', 'cursor', 'limit'])

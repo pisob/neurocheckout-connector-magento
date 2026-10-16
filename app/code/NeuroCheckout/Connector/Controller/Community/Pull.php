@@ -67,6 +67,14 @@ class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
             (string) ($_SERVER['REQUEST_URI'] ?? ''), SourcePullGateway::serverHeaders($_SERVER),
             $raw, (bool) $this->request->isSecure(),
             function (array $input, int $scope, array $configuration, string $directory) use ($raw): array {
+                if (($input['operation'] ?? null) === 'customer_history') {
+                    if ($input['storeId'] !== (string) $scope) { throw new \RuntimeException('source_invalid'); }
+                    $history = $this->sourceSnapshots->customerHistory()->read($scope, (int) $input['websiteId'],
+                        (int) $input['customerId'], $input['customerEmail']);
+                    if ((int) $this->storeManager->getStore()->getId() !== $scope) { throw new \RuntimeException('source_invalid'); }
+                    return ['schema'=>1,'shopId'=>$configuration['shopId'],'operation'=>'customer_history',
+                        'requestHash'=>hash('sha256',$raw),'history'=>$history];
+                }
                 if (($input['operation'] ?? null) === 'customer_prices') {
                     // Scope is selected by Magento's request context, never by JSON.
                     if ($input['storeId'] !== (string) $scope) { throw new \RuntimeException('source_invalid'); }

@@ -23,3 +23,4 @@ for attempt in {1..30}; do
 done
 [[ "$fixture_ready" == 1 ]]
 php tests/source_snapshot_test.php "$fixture_dir/mariadb.sock"
+php tests/customer_history_sql_test.php "$fixture_dir/mariadb.sock"

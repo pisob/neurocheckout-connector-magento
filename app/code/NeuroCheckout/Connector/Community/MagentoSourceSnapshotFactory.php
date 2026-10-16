@@ -26,6 +26,22 @@ final class MagentoSourceSnapshotFactory
 
     public function create(): MagentoSourceSnapshot
     {
+        return new MagentoSourceSnapshot($this->connection(), (string) $this->deployment->get('db/table_prefix', ''), function (int $scope): callable {
+            return $this->presentation->forStore($scope);
+        }, (int) $this->deployment->get('modules/Magento_Newsletter', 0) === 1,
+            $this->inventory === null ? null : function (int $scope, int $website): callable {
+                return $this->inventory->forStore($scope, $website);
+            });
+    }
+
+    public function customerHistory(): CustomerOrderHistory
+    {
+        return new CustomerOrderHistory($this->connection(), (string) $this->deployment->get('db/table_prefix', ''),
+            (int) $this->deployment->get('modules/Magento_Newsletter', 0) === 1);
+    }
+
+    private function connection(): PDO
+    {
         $name = $this->resources->getConnectionName('default');
         if (!is_string($name) || !preg_match('/^[A-Za-z0-9_-]+$/D', $name)
             || $this->resources->getConnectionName('checkout') !== $name
@@ -38,13 +54,7 @@ final class MagentoSourceSnapshotFactory
             throw new RuntimeException('source_schema_unavailable');
         }
         [$dsn, $username, $password] = self::connectionParameters($config);
-        $connection = new PDO($dsn, $username, $password, self::connectionOptions($config));
-        return new MagentoSourceSnapshot($connection, $prefix, function (int $scope): callable {
-            return $this->presentation->forStore($scope);
-        }, (int) $this->deployment->get('modules/Magento_Newsletter', 0) === 1,
-            $this->inventory === null ? null : function (int $scope, int $website): callable {
-                return $this->inventory->forStore($scope, $website);
-            });
+        return new PDO($dsn, $username, $password, self::connectionOptions($config));
     }
 
     /** Pure validation, no connection. Never log the returned credentials. */

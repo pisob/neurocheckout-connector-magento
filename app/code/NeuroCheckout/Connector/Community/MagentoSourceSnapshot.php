@@ -107,6 +107,7 @@ final class MagentoSourceSnapshot
             foreach ($quotes as $quote) {
                 $id = (int) $quote['entity_id'];
                 $quote['native_scope'] = (string) $scope;
+                $quote['website_id'] = $website;
                 $quote['marketing_consent'] = $this->marketingConsent($quote, $scope, $website);
                 $quote['items'] = $this->rows('SELECT item_id, parent_item_id, store_id, product_id, sku, name, product_type,
                     qty, price, row_total, discount_amount, tax_amount FROM ' . $this->table('quote_item') . ' WHERE quote_id=? ORDER BY item_id', [$id], 128);
