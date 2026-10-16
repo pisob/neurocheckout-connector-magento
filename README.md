@@ -45,6 +45,43 @@ Automated coverage includes native-service contract tests and disposable SQL
 factory/snapshot tests in CI. Local native read-only checks do not replace the
 remaining real recommendation-email and checkout acceptance tests.
 
+### Recipient-specific prices (candidate reader, not connected to delivery)
+
+`CustomerProductPrices` reads Magento's native one-unit final price for the
+identified customer, selected website/store view and explicitly requested
+currency. It uses that customer's group, native group/tier/special/catalog-rule
+pricing, native currency conversion and tax calculation with their own default
+address. It does not impersonate a customer session or create a checkout quote.
+The product model is reloaded and cloned so another customer's cached price is
+not reused. Tax-inclusive, tax-exclusive and dual display are distinct; dual
+display has no unlabeled single-price fallback. Prices exclude cart coupons,
+shipping and optional customizations; they are not checkout totals or guarantees.
+
+Only enabled, individually visible simple/virtual products without required
+options are supported. Missing customer/address/tax/currency context, price
+restrictions, fixed product taxes and unsupported B2B pricing fail closed.
+Enabling Magento's minimum-advertised-price feature alone does not exclude every
+product: the native configured minimum is compared to the recipient's final
+price. Composite/downloadable/option-aware pricing still needs separate support.
+Up to 16 exact product IDs can be read within a shared three-second cooperative
+budget; late responses or current-store changes invalidate the whole result.
+Synchronous native calls cannot be preempted. Individual product failures remain
+explicitly unavailable, not a fabricated price.
+
+This class has **no public endpoint and is not yet connected to the encrypted
+relay or a sender**. Its result is transient, customer-bound data: do not log it,
+persist it as a global product price or reuse it for another recipient. Addresses
+are never returned. Authenticated transport, freshness binding and a final
+pre-send recheck remain required before use in recommendation emails.
+
+Verification: 287 isolated recipient-price assertions, the full connector
+validator, and read-only checks on the local native Magento installation.
+Three products matched native final-price/tax services with repeatable results;
+two mandatory-option products and foreign-email/unsupported-currency requests
+were refused. Native checks ran in a read-only SQL transaction without changing
+installed source, customer preferences, orders or sending email. These checks
+do not certify third-party pricing extensions or a complete recommendation flow.
+
 Product snapshots include image and product URLs resolved for the selected store
 view. Images use Magento's configured media base (including a media CDN) and the
 actual product image path. Product IDs are never used as image identifiers.
