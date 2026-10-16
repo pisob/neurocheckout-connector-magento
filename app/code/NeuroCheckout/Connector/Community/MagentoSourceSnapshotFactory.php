@@ -38,7 +38,7 @@ final class MagentoSourceSnapshotFactory
         $connection = new PDO($dsn, $username, $password, self::connectionOptions($config));
         return new MagentoSourceSnapshot($connection, $prefix, function (int $scope): callable {
             return $this->presentation->forStore($scope);
-        });
+        }, (int) $this->deployment->get('modules/Magento_Newsletter', 0) === 1);
     }
 
     /** Pure validation, no connection. Never log the returned credentials. */

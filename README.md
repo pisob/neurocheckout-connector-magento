@@ -2,6 +2,22 @@
 
 ## Product details in Community emails
 
+### Native recommendation consent (candidate, not released)
+
+Local snapshots expose the native newsletter subscription only for an identified
+customer with matching current email, website and exact store view. Only a
+confirmed subscription grants permission; pending, inactive and unsubscribed
+states do not. Missing/deactivated newsletter support, duplicate subscriptions,
+foreign scopes and changed emails remain unknown. No customers are subscribed
+automatically, and this exporter never changes a newsletter record. The optional
+newsletter lookup cannot break normal cart synchronization when unavailable.
+Other store-view/global-customer consent is deliberately not inherited.
+
+Cloud must recheck this state plus unsubscribe/suppression and all sending rules
+before a recommendation email. This source change does not activate campaigns.
+Disposable native SQL tests cover these boundaries and retain checkout/snapshot
+regressions; real recommendation delivery remains a separate acceptance test.
+
 Product snapshots include image and product URLs resolved for the selected store
 view. Images use Magento's configured media base (including a media CDN) and the
 actual product image path. Product IDs are never used as image identifiers.

@@ -16,6 +16,8 @@ final class MagentoSourceSnapshot
     private array $batchValues = [];
     private array $batchChildren = [];
     private array $batchCategories = [];
+    private bool $marketingTablesReady = false;
+    private bool $newsletterEnabled;
     private const TABLES = ['store', 'store_website', 'catalog_product_entity', 'catalog_product_website',
         'eav_entity_type', 'eav_attribute', 'catalog_eav_attribute', 'catalog_product_entity_varchar',
         'catalog_product_entity_int', 'catalog_product_entity_decimal', 'catalog_product_entity_text',
@@ -23,13 +25,14 @@ final class MagentoSourceSnapshot
     private const ATTRIBUTES = ['name', 'status', 'visibility', 'price', 'special_price', 'special_from_date',
         'special_to_date', 'tax_class_id', 'weight', 'url_key', 'short_description', 'image'];
 
-    public function __construct(PDO $connection, string $prefix, ?callable $presentation = null)
+    public function __construct(PDO $connection, string $prefix, ?callable $presentation = null, bool $newsletterEnabled = false)
     {
         if (!preg_match('/^[A-Za-z0-9_]*$/D', $prefix) || $connection->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') {
             throw new RuntimeException('source_schema_unavailable');
         }
         $this->db = $connection; $this->prefix = $prefix;
         $this->presentation = $presentation;
+        $this->newsletterEnabled = $newsletterEnabled;
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         $this->db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
@@ -78,6 +81,8 @@ final class MagentoSourceSnapshot
             }
             foreach ($quotes as $quote) {
                 $id = (int) $quote['entity_id'];
+                $quote['native_scope'] = (string) $scope;
+                $quote['marketing_consent'] = $this->marketingConsent($quote, $scope, $website);
                 $quote['items'] = $this->rows('SELECT item_id, parent_item_id, store_id, product_id, sku, name, product_type,
                     qty, price, row_total, discount_amount, tax_amount FROM ' . $this->table('quote_item') . ' WHERE quote_id=? ORDER BY item_id', [$id], 128);
                 foreach ($quote['items'] as $item) {
@@ -184,6 +189,41 @@ final class MagentoSourceSnapshot
         $rowId = $this->rows('SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?',
             [$this->prefix . 'catalog_product_entity', 'row_id'], 1);
         if ($rowId) { throw new RuntimeException('source_schema_unavailable'); }
+        // Newsletter is optional. Its absence or unsupported storage must not
+        // break the existing cart path, and never implies marketing permission.
+        $marketingTables = $this->rows('SELECT TABLE_NAME,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN (?,?)',
+            [$this->prefix . 'customer_entity', $this->prefix . 'newsletter_subscriber'], 2);
+        $this->marketingTablesReady = $this->newsletterEnabled && count($marketingTables) === 2;
+        foreach ($marketingTables as $table) {
+            if (strcasecmp((string) $table['ENGINE'], 'InnoDB') !== 0) { $this->marketingTablesReady = false; }
+        }
+    }
+
+    private function marketingConsent(array $quote, int $scope, int $website): array
+    {
+        $result = ['state' => 'unknown', 'source' => 'magento_newsletter_subscription',
+            'email' => '', 'scope' => (string) $scope, 'changed_at' => null];
+        if (!$this->marketingTablesReady || (int) $quote['customer_id'] < 1 || (string) $quote['customer_is_guest'] !== '0') { return $result; }
+        try {
+            // Require current customer identity AND an exact store-view
+            // subscription. A guest billing address cannot select an account.
+            // Never inherit consent from another website or store view.
+            $rows = $this->rows('SELECT c.email, n.subscriber_status FROM ' . $this->table('customer_entity')
+                . ' c JOIN ' . $this->table('newsletter_subscriber') . ' n ON n.customer_id=c.entity_id'
+                . ' WHERE c.entity_id=? AND c.website_id=? AND n.store_id=?'
+                . ' AND LOWER(c.email)=LOWER(n.subscriber_email) AND LOWER(c.email)=LOWER(?) ORDER BY n.subscriber_id',
+                [(int) $quote['customer_id'], $website, $scope, (string) $quote['customer_email']], 2);
+            if (count($rows) !== 1) { return $result; }
+            $status = (string) $rows[0]['subscriber_status'];
+            // Magento: 1=subscribed, 2=not active, 3=unsubscribed, 4=unconfirmed.
+            if (!in_array($status, ['1','2','3','4'], true)) { return $result; }
+            $result['email'] = (string) $rows[0]['email'];
+            $result['state'] = $status === '1' ? 'granted' : 'denied';
+        } catch (\Throwable $error) {
+            // Optional/custom newsletter schema failure: marketing unavailable,
+            // not a cart synchronization failure. Do not expose exception data.
+        }
+        return $result;
     }
 
     private function table(string $name): string { return '`' . $this->prefix . $name . '`'; }
