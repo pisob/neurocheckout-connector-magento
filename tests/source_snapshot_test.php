@@ -35,7 +35,7 @@ namespace {
     use NeuroCheckout\Connector\Community\SourcePullGateway;
     use NeuroCheckout\Connector\Community\SourcePullProtocol;
     $base = dirname(__DIR__) . '/app/code/NeuroCheckout/Connector/Community/';
-    foreach (['ProductPresentation', 'MagentoSourceSnapshot', 'MagentoSourceSnapshotFactory', 'ReconciledSourceExporter', 'SourcePullGateway', 'SourcePullProtocol'] as $class) { require_once $base . $class . '.php'; }
+    foreach (['ProductPresentation', 'ProductAvailability', 'MagentoSourceSnapshot', 'MagentoSourceSnapshotFactory', 'ReconciledSourceExporter', 'SourcePullGateway', 'SourcePullProtocol'] as $class) { require_once $base . $class . '.php'; }
     $socket = $argv[1] ?? '';
     if (!preg_match('#^/tmp/nc-source-mariadb\.[A-Za-z0-9]+/mariadb\.sock$#D', $socket) || !file_exists($socket)) { exit(2); }
     $checks = 0;
@@ -78,6 +78,8 @@ namespace {
             'quote' => 'entity_id INT PRIMARY KEY, store_id INT, is_active INT, customer_id INT NULL, customer_is_guest INT, customer_email VARCHAR(128), customer_firstname VARCHAR(64), customer_lastname VARCHAR(64), created_at DATETIME, updated_at DATETIME, base_currency_code CHAR(3), quote_currency_code CHAR(3), grand_total DECIMAL(20,4), subtotal DECIMAL(20,4), subtotal_with_discount DECIMAL(20,4)',
             'quote_item' => 'item_id INT PRIMARY KEY, quote_id INT, parent_item_id INT NULL, store_id INT, product_id INT, sku VARCHAR(64), name VARCHAR(128), product_type VARCHAR(32), qty DECIMAL(12,4), price DECIMAL(20,4), row_total DECIMAL(20,4), discount_amount DECIMAL(20,4), tax_amount DECIMAL(20,4)',
             'sales_order' => 'entity_id INT PRIMARY KEY, quote_id INT, store_id INT, increment_id VARCHAR(64), state VARCHAR(32), status VARCHAR(32), grand_total DECIMAL(20,4), order_currency_code CHAR(3), created_at DATETIME',
+            'customer_entity' => 'entity_id INT PRIMARY KEY, website_id INT, email VARCHAR(255)',
+            'newsletter_subscriber' => 'subscriber_id INT PRIMARY KEY, customer_id INT, store_id INT, subscriber_email VARCHAR(255), subscriber_status INT',
         ];
         foreach (['varchar' => 'VARCHAR(255)', 'int' => 'INT', 'decimal' => 'DECIMAL(20,6)', 'text' => 'TEXT', 'datetime' => 'DATETIME'] as $type => $column) {
             $schemas['catalog_product_entity_' . $type] = 'value_id INT AUTO_INCREMENT PRIMARY KEY, entity_id INT, attribute_id INT, store_id INT, value ' . $column . ', UNIQUE(entity_id,attribute_id,store_id)';
@@ -101,7 +103,7 @@ namespace {
             "INSERT INTO mg_quote_item VALUES (1,1,NULL,1,10,'SHARED','Nom été','simple',1,45,45,0,0),(2,2,NULL,2,10,'SHARED','Other view','simple',1,999,999,0,0)",
         ] as $sql) { $writer->exec($sql); }
         $readerPDO = new MagentoTestPDO($dsn . ';dbname=' . $database, 'root', '');
-        $reader = new MagentoSourceSnapshot($readerPDO, 'mg_');
+        $reader = new MagentoSourceSnapshot($readerPDO, 'mg_', null, true);
         $snapshot = $reader->capture(1);
         checkMagento(count($snapshot) === 2, 'Selected website product and exact store quote');
         $product = $snapshot[0]['payload']; $cart = $snapshot[1]['payload'];
@@ -110,6 +112,35 @@ namespace {
         checkMagento((int) $product['attributes']['status']['effective'] === 1, 'Global status ignores invalid per-view row');
         checkMagento(!$product['children'] && $product['inventory_status'] === 'not_exported', 'Foreign child excluded; no invented MSI quantity');
         checkMagento($cart['status'] === 'active' && (int) $cart['customer_is_guest'] === 1, 'Guest quote retained');
+        checkMagento($cart['marketing_consent']['state'] === 'unknown', 'guest quote email does not imply consent');
+        $writer->exec("INSERT INTO mg_customer_entity VALUES (7,1,'fixture@example.invalid')");
+        $writer->exec("INSERT INTO mg_newsletter_subscriber VALUES (1,7,1,'fixture@example.invalid',1)");
+        checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'unknown', 'guest cannot borrow a subscribed customer email');
+        $writer->exec('UPDATE mg_quote SET customer_id=7,customer_is_guest=0 WHERE entity_id=1');
+        checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'granted', 'exact native account subscription exported');
+        checkMagento((new MagentoSourceSnapshot($readerPDO, 'mg_'))->capture(1)[1]['payload']['marketing_consent']['state'] === 'unknown', 'disabled newsletter module cannot grant even if native tables remain');
+        foreach ([2,3,4] as $status) {
+            $writer->exec('UPDATE mg_newsletter_subscriber SET subscriber_status='.$status.' WHERE subscriber_id=1');
+            checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'denied', 'unconfirmed/inactive/withdrawn never granted');
+        }
+        $writer->exec('UPDATE mg_newsletter_subscriber SET subscriber_status=1,store_id=2 WHERE subscriber_id=1');
+        checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'unknown', 'other store-view subscription not inherited');
+        $writer->exec('UPDATE mg_newsletter_subscriber SET store_id=1 WHERE subscriber_id=1');
+        $writer->exec('UPDATE mg_customer_entity SET website_id=2 WHERE entity_id=7');
+        checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'unknown', 'other website customer not eligible');
+        $writer->exec("UPDATE mg_customer_entity SET website_id=1,email='changed@example.invalid' WHERE entity_id=7");
+        checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'unknown', 'grant cannot survive account email mismatch');
+        $writer->exec("UPDATE mg_customer_entity SET email='fixture@example.invalid' WHERE entity_id=7");
+        $writer->exec("INSERT INTO mg_newsletter_subscriber VALUES (2,7,1,'fixture@example.invalid',1)");
+        checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'unknown', 'duplicate subscription is not consent evidence');
+        $writer->exec('DELETE FROM mg_newsletter_subscriber WHERE subscriber_id=2');
+        $writer->exec('ALTER TABLE mg_newsletter_subscriber ENGINE=MyISAM');
+        checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'unknown', 'unsupported newsletter storage does not break cart capture');
+        $writer->exec('ALTER TABLE mg_newsletter_subscriber ENGINE=InnoDB');
+        $writer->exec('RENAME TABLE mg_newsletter_subscriber TO mg_newsletter_disabled');
+        checkMagento($reader->capture(1)[1]['payload']['marketing_consent']['state'] === 'unknown', 'absent optional newsletter module keeps carts usable');
+        $writer->exec('RENAME TABLE mg_newsletter_disabled TO mg_newsletter_subscriber');
+        $writer->exec('UPDATE mg_quote SET customer_id=NULL,customer_is_guest=1 WHERE entity_id=1');
         checkMagento(strpos(json_encode($snapshot), 'other@example.invalid') === false && strpos(json_encode($snapshot), 'foreign@example.invalid') === false, 'No other view or website contacts');
         checkMagento($reader->capture(2)[1]['payload']['status'] === 'inactive', 'Inactive quote without order is not converted');
         rejectMagento(static function () use ($reader) { $reader->capture(4); }, 'source_shop_unavailable');
@@ -157,6 +188,37 @@ namespace {
         checkMagento(count($factory->create()->capture(1)) === 2, 'Factory uses isolated runtime connection');
         checkMagento($factory->create()->capture(1)[0]['payload']['image_url'] === 'https://cdn.example.invalid/store-1/image-10.jpg', 'Snapshot includes store scoped product media');
         checkMagento($factory->create()->capture(2)[0]['payload']['product_url'] === 'https://shop.example.invalid/view-2/product/10', 'Product URL uses selected store');
+        $inventory = new class extends \NeuroCheckout\Connector\Community\ProductAvailability {
+            public string $mode = 'available'; public array $scopes = [];
+            public function __construct() {}
+            public function forStore(int $scope, int $website): callable {
+                $this->scopes[] = [$scope, $website];
+                if ($this->mode === 'init_failure') { throw new \RuntimeException('private init error'); }
+                return function (array $products) use ($scope, $website): array {
+                    if ($this->mode === 'read_failure') { throw new \RuntimeException('private read error'); }
+                    checkMagento(count($products) <= 128 && isset($products[0]['attributes']['status']), 'inventory receives bounded hydrated batch');
+                    return [$products[0]['entity_id'] => ['available_for_sale' => $this->mode !== 'denied',
+                        'inventory_status' => 'website_salable', 'price' => 9999,
+                        'inventory_scope' => ['store_id' => $scope, 'website_id' => $this->mode === 'foreign' ? 999 : $website,
+                            'stock_id' => 9, 'requested_qty' => 1]]];
+                };
+            }
+        };
+        $stockFactory = new MagentoSourceSnapshotFactory($deployment, $resources, $presentation, $inventory);
+        $stockSnapshot = $stockFactory->create()->capture(1);
+        checkMagento($stockSnapshot[0]['payload']['available_for_sale'] === true, 'native inventory injected through factory');
+        checkMagento($inventory->scopes === [[1,1]], 'native inventory receives exact store/website');
+        checkMagento(!isset($stockSnapshot[0]['payload']['price']), 'inventory cannot overwrite unrelated product fields');
+        checkMagento($stockFactory->create()->capture(1) === $stockSnapshot, 'stable inventory does not force endless source revisions');
+        $inventory->mode = 'denied';
+        checkMagento($stockFactory->create()->capture(1)[0]['payload']['available_for_sale'] === false, 'reservation/stock denial replaces previous grant');
+        foreach (['init_failure', 'read_failure', 'foreign'] as $mode) {
+            $inventory->mode = $mode; $unknown = $stockFactory->create()->capture(1);
+            checkMagento($unknown[0]['payload']['inventory_status'] === 'not_exported'
+                && !isset($unknown[0]['payload']['available_for_sale']), 'native failure or foreign evidence never grants');
+            checkMagento($unknown[1] === $stockSnapshot[1], 'optional inventory failure preserves cart');
+            checkMagento(strpos(json_encode($unknown), 'private') === false, 'native exceptions do not leak into source');
+        }
         $split = new class implements \Magento\Framework\App\ResourceConnection\ConfigInterface { public function getConnectionName($name) { return $name; } };
         rejectMagento(static function () use ($deployment, $split, $presentation) { (new MagentoSourceSnapshotFactory($deployment, $split, $presentation))->create(); }, 'source_schema_unavailable');
         foreach ([['driver_options' => [1009 => '/private/test-ca']], ['host' => 'localhost;dbname=other'], ['dbname' => 'bad;database'], ['initStatements' => 'DELETE FROM quote'], ['port' => 3306], ['model' => 'other']] as $change) {

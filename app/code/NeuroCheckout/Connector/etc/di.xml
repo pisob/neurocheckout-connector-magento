@@ -21,4 +21,9 @@
             </argument>
         </arguments>
     </type>
+    <type name="NeuroCheckout\Connector\Community\MagentoSourceSnapshotFactory">
+        <arguments>
+            <argument name="inventory" xsi:type="object">NeuroCheckout\Connector\Community\ProductAvailability</argument>
+        </arguments>
+    </type>
 </config>

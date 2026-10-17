@@ -1,6 +1,128 @@
 # NeuroCheckout Connector for Magento
 
+Version 1.0.9 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent recommendation campaigns remain incomplete and are not enabled by installing this release.
+
 ## Product details in Community emails
+
+### Native recommendation consent (1.0.9)
+
+Local snapshots expose the native newsletter subscription only for an identified
+customer with matching current email, website and exact store view. Only a
+confirmed subscription grants permission; pending, inactive and unsubscribed
+states do not. Missing/deactivated newsletter support, duplicate subscriptions,
+foreign scopes and changed emails remain unknown. No customers are subscribed
+automatically, and this exporter never changes a newsletter record. The optional
+newsletter lookup cannot break normal cart synchronization when unavailable.
+Other store-view/global-customer consent is deliberately not inherited.
+
+Cloud must recheck this state plus unsubscribe/suppression and all sending rules
+before a recommendation email. This source change does not activate campaigns.
+Disposable native SQL tests cover these boundaries and retain checkout/snapshot
+regressions; real recommendation delivery remains a separate acceptance test.
+
+### Website stock evidence (1.0.9)
+
+Snapshots now use Magento's native MSI website stock resolver and both salability
+and requested-quantity checks for one unit. This includes reservations and native
+backorder policy; a legacy/global quantity or indexed in-stock flag alone does
+not suffice. Evidence is bound to the exact store view, website and stock.
+The current Magento request store must also match before, between and after the
+native calls, since stock configuration can depend on that context.
+Only enabled, individually visible simple, virtual and downloadable products are
+checked. Composite/custom product types remain unknown until their option-aware
+selection and pricing are supported. This is inventory evidence, not a guarantee
+that every customer can check out with the item.
+
+Optional or disabled MSI, native failures, foreign/duplicate/incomplete responses
+and expired reads leave inventory unknown without breaking normal cart records.
+Checks use at most 128 products per batch and a shared 1.5-second cooperative
+budget. A late native response is discarded; a synchronous service cannot be
+preempted. The existing five-second capture limit is unchanged. Freshness stays
+in the signed source envelope; timestamps are not added to product payloads, so
+unchanged stock does not cause perpetual resynchronization.
+
+This does **not** yet export a recipient/tax-aware final display price or activate
+recommendation campaigns. Raw EAV prices must not be advertised as final prices.
+Automated coverage includes native-service contract tests and disposable SQL
+factory/snapshot tests in CI. Local native read-only checks do not replace the
+remaining real recommendation-email and checkout acceptance tests.
+
+### Recipient-specific prices (1.0.9; delivery integration remains incomplete)
+
+`CustomerProductPrices` reads Magento's native one-unit final price for the
+identified customer, selected website/store view and explicitly requested
+currency. It uses that customer's group, native group/tier/special/catalog-rule
+pricing, native currency conversion and tax calculation with their own default
+address. It does not impersonate a customer session or create a checkout quote.
+The product model is reloaded and cloned so another customer's cached price is
+not reused. Tax-inclusive, tax-exclusive and dual display are distinct; dual
+display has no unlabeled single-price fallback. Prices exclude cart coupons,
+shipping and optional customizations; they are not checkout totals or guarantees.
+
+Only enabled, individually visible simple/virtual products without required
+options are supported. Missing customer/address/tax/currency context, price
+restrictions, fixed product taxes and unsupported B2B pricing fail closed.
+Enabling Magento's minimum-advertised-price feature alone does not exclude every
+product: the native configured minimum is compared to the recipient's final
+price. Composite/downloadable/option-aware pricing still needs separate support.
+Up to 16 exact product IDs can be read within a shared three-second cooperative
+budget; late responses or current-store changes invalidate the whole result.
+Synchronous native calls cannot be preempted. Individual product failures remain
+explicitly unavailable, not a fabricated price.
+
+The candidate exposes this read through the existing authenticated
+`POST /neurocheckout/community/pull` source route (`customer_prices` operation),
+with a matching Community client. The request binds the shop, expected native
+store/website, customer ID/email, currency and product IDs. Magento's current
+store is authoritative; JSON cannot select another store. Existing HMAC, HTTPS,
+durable nonce and rate guards remain. The response binds the exact request hash,
+has a 15-second freshness window and a 16 KiB limit. Errors are unavailable, not
+empty successful reads. Source pagination remains compatible.
+
+The result is transient, customer-bound data: do not log it, persist it as a
+global product price or reuse it for another recipient. Addresses are never
+returned. This is **not connected to a recommendation sender**: recipient-bound
+selection and final pre-send rechecks remain required. Installing this candidate
+alone does not activate independent recommendation emails.
+
+Verification: 287 isolated recipient-price assertions, the full connector
+validator, and read-only checks on the local native Magento installation.
+Three products matched native final-price/tax services with repeatable results;
+two mandatory-option products and foreign-email/unsupported-currency requests
+were refused. Native checks ran in a read-only SQL transaction without changing
+installed source, customer preferences, orders or sending email. These checks
+do not certify third-party pricing extensions or a complete recommendation flow.
+The transport additionally passes 44 synthetic protocol assertions. A read-only
+native PHP/Community bridge verified two signed three-product reads, replay
+refusal and controller construction with real Magento services. It did not
+exercise a deployed HTTPS route or change the installed module.
+
+### Native account order history (1.0.9)
+
+The signed source route also supports `customer_history` for an exact native
+store/website/customer ID and current account email. `CustomerOrderHistory` reads
+native sales tables directly, including orders whose original quote was removed.
+Other store views, other accounts and guest orders sharing an email are excluded.
+The account must be active and confirmed. A dedicated repeatable-read READ ONLY
+transaction keeps orders, lines, account and optional newsletter state consistent.
+It never modifies customers, orders, subscriptions or quotes.
+
+Native state/status, currency, paid/refunded amounts and line parent relations
+are returned as facts. Unknown paid amounts remain null; creation of an order is
+not proof of payment. No address, customer name or payment details are returned.
+Missing/disabled/ambiguous newsletter data remains unknown, never consent.
+Limits are 128 orders, 512 lines, 64,000 bytes of history and a three-second
+cooperative read budget. Required tables must support consistent transactions.
+Missing tables, drift, malformed data and overflow fail without partial success.
+HMAC, durable nonce/rate checks, request hash and 15-second freshness protect the
+response; existing source pagination is unchanged.
+
+The SQL/protocol suite includes 61 history assertions, concurrent payment updates,
+write refusal, foreign scope, duplicate/invalid lines, missing newsletter support
+and capacity failures. A read-only candidate bridge matched three local account
+orders against Magento's native order repository in two consistent signed reads,
+and refused replay. No installed module, consent or order was changed, and no
+email was sent. This is not live HTTPS or end-to-end recommendation acceptance.
 
 Product snapshots include image and product URLs resolved for the selected store
 view. Images use Magento's configured media base (including a media CDN) and the
@@ -22,10 +144,10 @@ time to finish. Store-scoped data and database consistency checks remain enforce
 
 ## Availability
 
-The current installable connector is **v1.0.8**:
+The current installable connector is **v1.0.9**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.8/neurocheckout-connector-magento-1.0.8.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.8).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.9/neurocheckout-connector-magento-1.0.9.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.9).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
