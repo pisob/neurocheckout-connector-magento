@@ -1,8 +1,10 @@
 # NeuroCheckout Connector for Magento
 
+Version 1.0.9 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent recommendation campaigns remain incomplete and are not enabled by installing this release.
+
 ## Product details in Community emails
 
-### Native recommendation consent (candidate, not released)
+### Native recommendation consent (1.0.9)
 
 Local snapshots expose the native newsletter subscription only for an identified
 customer with matching current email, website and exact store view. Only a
@@ -18,7 +20,7 @@ before a recommendation email. This source change does not activate campaigns.
 Disposable native SQL tests cover these boundaries and retain checkout/snapshot
 regressions; real recommendation delivery remains a separate acceptance test.
 
-### Website stock evidence (candidate, not released)
+### Website stock evidence (1.0.9)
 
 Snapshots now use Magento's native MSI website stock resolver and both salability
 and requested-quantity checks for one unit. This includes reservations and native
@@ -45,7 +47,7 @@ Automated coverage includes native-service contract tests and disposable SQL
 factory/snapshot tests in CI. Local native read-only checks do not replace the
 remaining real recommendation-email and checkout acceptance tests.
 
-### Recipient-specific prices (candidate reader, not connected to delivery)
+### Recipient-specific prices (1.0.9; delivery integration remains incomplete)
 
 `CustomerProductPrices` reads Magento's native one-unit final price for the
 identified customer, selected website/store view and explicitly requested
@@ -95,7 +97,7 @@ native PHP/Community bridge verified two signed three-product reads, replay
 refusal and controller construction with real Magento services. It did not
 exercise a deployed HTTPS route or change the installed module.
 
-### Native account order history (candidate, not released)
+### Native account order history (1.0.9)
 
 The signed source route also supports `customer_history` for an exact native
 store/website/customer ID and current account email. `CustomerOrderHistory` reads
@@ -142,10 +144,10 @@ time to finish. Store-scoped data and database consistency checks remain enforce
 
 ## Availability
 
-The current installable connector is **v1.0.8**:
+The current installable connector is **v1.0.9**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.8/neurocheckout-connector-magento-1.0.8.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.8).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.9/neurocheckout-connector-magento-1.0.9.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.9).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
