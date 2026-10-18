@@ -27,6 +27,12 @@ final class CustomerOrderHistory
         $db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
     }
 
+    public function index(int $scope, array $input): array
+    {
+        require_once __DIR__ . '/CustomerHistoryIndex.php';
+        return CustomerHistoryIndex::read($this->db,'magento',$this->prefix,$scope,$input);
+    }
+
     public function read(int $scope, int $website, int $customer, string $email, bool $activeCarts=false): array
     {
         $ownedTransaction = false;

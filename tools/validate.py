@@ -19,3 +19,5 @@ subprocess.run(["php", str(root / "tests/recovery_safety_test.php")], cwd=root, 
 subprocess.run(["php", str(root / "tests/webapi_payload_test.php")], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/customer_carts_protocol_test.php")], cwd=root, check=True, timeout=60)
 print("All PHP files linted; isolated tests passed. Real platform integration is not covered.")
+
+subprocess.run(["php", str(root / "tests/history_index_protocol_test.php")], cwd=root, check=True, timeout=60)
