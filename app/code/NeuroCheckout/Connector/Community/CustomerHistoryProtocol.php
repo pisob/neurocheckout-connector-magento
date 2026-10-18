@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 namespace NeuroCheckout\Connector\Community;
+require_once __DIR__ . '/NativeHistoryV2.php';
 
 /** Bounded native history wire shape; no marketing eligibility decisions. */
 final class CustomerHistoryProtocol
@@ -23,6 +24,7 @@ final class CustomerHistoryProtocol
     }
     public static function history($h, array $input): void
     {
+        $h=NativeHistoryV2::legacy($h,'magento-customer-history-v1');
         if (!self::keys($h,['schema','store_id','website_id','customer_id','customer_email','customer_group_id',
                 'customer_created_at','read_at','complete','order_count','orders','marketing_consent'])
             || $h['schema']!=='magento-customer-history-v1' || $h['complete']!==true
