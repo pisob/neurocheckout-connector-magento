@@ -1,5 +1,29 @@
 # NeuroCheckout Connector for Magento
 
+## Native account carts (candidate, 2026-10-18)
+
+The signed `customer_carts` operation reads active native quotes for the exact
+registered customer, website and store view. A positive native item quantity
+means an active cart; empty or inactive quotes do not. The reader validates the
+current account and native newsletter consent, without changing either. Other
+store views, anonymous quotes and uncommitted browser changes are not borrowed.
+No age heuristic silently discards an old active quote.
+
+An owned read-only repeatable InnoDB snapshot covers account, quote/items and
+enabled newsletter tables. Reads are limited to 128 quotes/512 items, bounded
+SQL/lock waits and a three-second cooperative budget. Missing/foreign/malformed
+rows, nontransactional tables and overflow fail closed. Only identity, consent,
+completeness, read time and cart presence leave the reader; quote lines stay
+native. Source HMAC/nonces/HTTPS apply with 4 KiB/15-second freshness bounds.
+
+This unreleased operation requires matching candidate Community/Cloud support.
+It does not activate autonomous recommendations or establish atomic coordination
+between checkout and SMTP. Validation: 37 signed protocol assertions and 30 real
+disposable SQL assertions, plus existing validator and SQL regressions. Tests
+include foreign scopes, consent, inactive quotes, snapshot concurrency, read-only
+enforcement and capacity/schema failures. Installed-store HTTP and real
+recommendation delivery remain separate acceptance work.
+
 Version 1.0.9 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent recommendation campaigns remain incomplete and are not enabled by installing this release.
 
 ## Product details in Community emails

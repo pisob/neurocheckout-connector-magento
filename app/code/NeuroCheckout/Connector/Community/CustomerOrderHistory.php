@@ -5,6 +5,8 @@ namespace NeuroCheckout\Connector\Community;
 use PDO;
 use RuntimeException;
 
+require_once __DIR__ . '/CustomerCartsProtocol.php';
+
 /** Native facts only. No audience selection, payment inference or persistence. */
 final class CustomerOrderHistory
 {
@@ -25,7 +27,7 @@ final class CustomerOrderHistory
         $db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
     }
 
-    public function read(int $scope, int $website, int $customer, string $email): array
+    public function read(int $scope, int $website, int $customer, string $email, bool $activeCarts=false): array
     {
         $ownedTransaction = false;
         try {
@@ -35,13 +37,24 @@ final class CustomerOrderHistory
             $version = (string) $this->db->getAttribute(PDO::ATTR_SERVER_VERSION);
             $this->db->exec(stripos($version, 'mariadb') !== false
                 ? 'SET SESSION max_statement_time=1' : 'SET SESSION MAX_EXECUTION_TIME=1000');
-            $names = array_map(function ($name) { return $this->prefix . $name; }, self::TABLES);
+            $names = array_map(function ($name) { return $this->prefix . $name; },
+                $activeCarts ? ['store','store_website','customer_entity','quote','quote_item'] : self::TABLES);
+            if ($activeCarts && $this->newsletterEnabled) { $names[]=$this->prefix.'newsletter_subscriber'; }
+            if ($activeCarts) {
+                $this->db->exec('SET SESSION lock_wait_timeout=1');
+                $this->db->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+                $this->db->exec('SET TRANSACTION READ ONLY');
+                $this->db->beginTransaction(); $ownedTransaction=true;
+                foreach ($names as $name) { $this->rows('SELECT 1 FROM `'.$name.'` WHERE 1=0',[],0); }
+            }
             $tables = $this->rows('SELECT TABLE_NAME,ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('
                 . implode(',', array_fill(0, count($names), '?')) . ')', $names, count($names));
             if (count($tables) !== count($names)) { throw new RuntimeException(); }
             foreach ($tables as $table) { if (strcasecmp((string) $table['ENGINE'], 'InnoDB') !== 0) { throw new RuntimeException(); } }
-            $this->db->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
-            $this->db->exec('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY'); $ownedTransaction = true;
+            if (!$activeCarts) {
+                $this->db->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+                $this->db->exec('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY'); $ownedTransaction = true;
+            }
             $stores = $this->rows('SELECT s.store_id FROM ' . $this->table('store') . ' s JOIN ' . $this->table('store_website')
                 . ' w ON w.website_id=s.website_id WHERE s.store_id=? AND s.website_id=? AND s.is_active=1', [$scope,$website], 1);
             $customers = $this->rows('SELECT entity_id,email,group_id,created_at FROM ' . $this->table('customer_entity')
@@ -49,6 +62,28 @@ final class CustomerOrderHistory
                 . ' AND LOWER(email)=LOWER(?)', [$customer,$website,$email], 1);
             if (count($stores) !== 1 || count($customers) !== 1) { throw new RuntimeException(); }
             $person = $customers[0];
+            if ($activeCarts) {
+                $quotes=$this->rows('SELECT entity_id,customer_is_guest FROM '.$this->table('quote')
+                    .' WHERE store_id=? AND customer_id=? AND is_active=1 ORDER BY entity_id',[$scope,$customer],128);
+                $ids=[];
+                foreach ($quotes as $quote) {
+                    if ((string)$quote['customer_is_guest']!=='0') { throw new RuntimeException(); }
+                    $ids[]=$quote['entity_id'];
+                }
+                $lines=$ids ? $this->rows('SELECT store_id,CAST(qty AS CHAR) qty FROM '.$this->table('quote_item')
+                    .' WHERE quote_id IN ('.implode(',',array_fill(0,count($ids),'?')).')',$ids,512) : [];
+                $active=false;
+                foreach ($lines as $line) {
+                    if ((int)$line['store_id']!==$scope || !is_string($line['qty'])
+                        || !preg_match('/^\d{1,10}(?:\.\d{1,4})?$/D',$line['qty'])) { throw new RuntimeException(); }
+                    $active=$active || (float)$line['qty']>0;
+                }
+                $result=CustomerCartsProtocol::result(['storeId'=>(string)$scope,'websiteId'=>(string)$website,
+                    'customerId'=>(string)$customer,'customerEmail'=>$person['email']],$active,
+                    $this->consent($scope,$customer,(string)$person['email']));
+                if (microtime(true)-$this->started>3) { throw new RuntimeException(); }
+                return $result;
+            }
             // Read sales tables directly, including orders whose quote was removed.
             // Guest orders sharing an email are never borrowed by an account.
             $orders = $this->rows('SELECT entity_id,state,status,created_at,updated_at,order_currency_code,grand_total,total_paid,total_refunded'

@@ -40,14 +40,16 @@ final class SourcePullGateway
                 static function (string $nonce, int $ttl) use ($statePath): bool {
                     return self::guard($statePath, $nonce, $ttl);
                 }, true, $configuration['environment']);
-            if (in_array($input['operation'] ?? null, ['customer_prices','customer_history'], true) && $input['storeId'] !== (string) $nativeScope) {
+            if (in_array($input['operation'] ?? null, ['customer_prices','customer_history','customer_carts'], true) && $input['storeId'] !== (string) $nativeScope) {
                 throw new RuntimeException('source_invalid');
             }
             if ($exporter === null) {
                 return self::error(503, 'source_export_not_ready');
             }
             $page = $exporter($input, $nativeScope, $configuration, $directory);
-            if (($input['operation'] ?? null) === 'customer_history') {
+            if (($input['operation'] ?? null) === 'customer_carts') {
+                CustomerCartsProtocol::response($page, $input, $nativeScope, $raw);
+            } elseif (($input['operation'] ?? null) === 'customer_history') {
                 CustomerHistoryProtocol::response($page, $input, $nativeScope, $raw);
             } elseif (($input['operation'] ?? null) === 'customer_prices') {
                 CustomerPricesProtocol::response($page, $input, $nativeScope, $raw);
