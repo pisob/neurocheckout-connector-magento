@@ -47,6 +47,9 @@ final class SourcePullGateway
                 return self::error(503, 'source_export_not_ready');
             }
             $page = $exporter($input, $nativeScope, $configuration, $directory);
+            if (($input['operation'] ?? null)==='customer_history_index') {
+                CustomerHistoryIndex::response($page,$input,$raw,$platform,$nativeScope);
+            } else {
             if (($input['operation'] ?? null) === 'customer_carts') {
                 CustomerCartsProtocol::response($page, $input, $nativeScope, $raw);
             } elseif (($input['operation'] ?? null) === 'customer_history') {
@@ -55,6 +58,7 @@ final class SourcePullGateway
                 CustomerPricesProtocol::response($page, $input, $nativeScope, $raw);
             } else {
                 self::validatePage($page, $input);
+            }
             }
             $body = json_encode($page, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             return [200, self::headers() + [

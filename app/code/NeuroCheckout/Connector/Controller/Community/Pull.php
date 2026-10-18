@@ -67,6 +67,10 @@ class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
             (string) ($_SERVER['REQUEST_URI'] ?? ''), SourcePullGateway::serverHeaders($_SERVER),
             $raw, (bool) $this->request->isSecure(),
             function (array $input, int $scope, array $configuration, string $directory) use ($raw): array {
+                if (($input['operation'] ?? null)==='customer_history_index') {
+                    return ['schema'=>1,'shopId'=>$input['shopId'],'operation'=>'customer_history_index',
+                        'requestHash'=>hash('sha256',$raw),'index'=>$this->sourceSnapshots->customerHistory()->index($scope,$input)];
+                }
                 if (($input['operation'] ?? null) === 'customer_carts') {
                     if ($input['storeId']!==(string)$scope) { throw new \RuntimeException('source_invalid'); }
                     $carts=$this->sourceSnapshots->customerHistory()->read($scope,(int)$input['websiteId'],
