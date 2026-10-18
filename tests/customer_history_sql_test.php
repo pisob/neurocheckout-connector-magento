@@ -37,7 +37,7 @@ try {
         'store_website'=>'website_id INT PRIMARY KEY',
         'store'=>'store_id INT PRIMARY KEY,website_id INT,is_active INT',
         'customer_entity'=>'entity_id INT PRIMARY KEY,website_id INT,email VARCHAR(255),group_id INT,created_at DATETIME,is_active INT,confirmation VARCHAR(64) NULL',
-        'sales_order'=>'entity_id INT PRIMARY KEY,store_id INT,customer_id INT,customer_is_guest INT,state VARCHAR(32),status VARCHAR(64),created_at DATETIME,updated_at DATETIME,order_currency_code CHAR(3),grand_total DECIMAL(20,4),total_paid DECIMAL(20,4) NULL,total_refunded DECIMAL(20,4) NULL',
+        'sales_order'=>'entity_id INT PRIMARY KEY,store_id INT,customer_id INT,customer_is_guest INT,state VARCHAR(32),status VARCHAR(64),created_at DATETIME,updated_at DATETIME,order_currency_code CHAR(3),grand_total DECIMAL(20,4),total_paid DECIMAL(20,4) NULL,total_refunded DECIMAL(20,4) NULL,discount_amount DECIMAL(20,4) DEFAULT 0',
         'sales_order_item'=>'item_id INT PRIMARY KEY,order_id INT,parent_item_id INT NULL,store_id INT,product_id INT NULL,product_type VARCHAR(32),qty_ordered DECIMAL(12,4),qty_invoiced DECIMAL(12,4),qty_refunded DECIMAL(12,4),qty_canceled DECIMAL(12,4)',
         'newsletter_subscriber'=>'subscriber_id INT PRIMARY KEY,customer_id INT,store_id INT,subscriber_email VARCHAR(255),subscriber_status INT',
     ];
@@ -47,7 +47,7 @@ try {
     $writer->exec("INSERT INTO mh_customer_entity VALUES(7,1,'private@example.test',2,'2020-01-01 00:00:00',1,NULL),
         (8,2,'private@example.test',2,'2020-01-01 00:00:00',1,NULL),(9,1,'new@example.test',2,'2020-01-01 00:00:00',1,NULL)");
     $writer->exec("INSERT INTO mh_newsletter_subscriber VALUES(1,7,1,'private@example.test',1)");
-    $writer->exec("INSERT INTO mh_sales_order VALUES
+    $writer->exec("INSERT INTO mh_sales_order (entity_id,store_id,customer_id,customer_is_guest,state,status,created_at,updated_at,order_currency_code,grand_total,total_paid,total_refunded) VALUES
         (1,1,7,0,'new','pending','2020-02-01 00:00:00','2020-02-01 00:00:00','EUR',30,NULL,NULL),
         (2,1,7,0,'canceled','canceled','2020-03-01 00:00:00','2020-03-01 00:00:00','EUR',20,0,NULL),
         (3,1,7,0,'complete','complete','2020-04-01 00:00:00','2020-04-01 00:00:00','EUR',40,40,0),
@@ -63,6 +63,10 @@ try {
     $reader=new CustomerOrderHistory($db,'mh_',true);
     $input=['storeId'=>'1','websiteId'=>'1','customerId'=>'7','customerEmail'=>'private@example.test'];
     $h=$reader->read(1,1,7,'private@example.test');
+    historyCheck($h['schema']==='magento-customer-history-v2'&&$h['orders'][0]['discount_total']==='0.0000','explicit zero discount');
+    $writer->exec('UPDATE mh_sales_order SET discount_amount=-7.125 WHERE entity_id=3');
+    historyCheck($reader->read(1,1,7,'private@example.test')['orders'][2]['discount_total']==='7.1250','native signed discount becomes magnitude');
+    $writer->exec('UPDATE mh_sales_order SET discount_amount=0 WHERE entity_id=3');
     historyCheck($h['complete'] && $h['order_count']===4,'complete orders without any quote table');
     historyCheck(array_column($h['orders'],'order_id')===['1','2','3','4'],'no foreign store/customer/guest orders');
     historyCheck($h['orders'][0]['total_paid']===null && $h['orders'][1]['state']==='canceled','unpaid and canceled not converted into paid');
@@ -114,6 +118,9 @@ try {
     $secret=bin2hex(random_bytes(32));$path='/neurocheckout/community/pull';
     $config=['enabled'=>true,'environment'=>'production','nativeScope'=>1,'platform'=>'magento','shopId'=>'synthetic-shop','secret'=>$secret];
     $request=['schema'=>1,'shopId'=>'synthetic-shop','operation'=>'customer_history']+$input;
+    foreach([null,'0','7.12500000'] as $discount){$valid=$h;$valid['orders'][0]['discount_total']=$discount;CustomerHistoryProtocol::history($valid,$input);historyCheck(true,'v2 discount preserved');}
+    foreach([true,2,'-1','1e2',str_repeat('9',27)] as $discount){$bad=$h;$bad['orders'][0]['discount_total']=$discount;historyRefuse(static function()use($bad,$input){CustomerHistoryProtocol::history($bad,$input);});}
+    $bad=$h;unset($bad['orders'][0]['discount_total']);historyRefuse(static function()use($bad,$input){CustomerHistoryProtocol::history($bad,$input);});
     foreach([['schema'=>true],['shopId'=>'foreign'],['operation'=>'read'],['storeId'=>1],['storeId'=>'01'],
         ['websiteId'=>'0'],['customerId'=>false],['customerEmail'=>'invalid'],['callback'=>'https://other.invalid']] as $patch) {
         historyRefuse(static function()use($request,$patch){CustomerHistoryProtocol::request(array_replace($request,$patch),'synthetic-shop');});
@@ -159,7 +166,7 @@ try {
     for($id=1000;$id<1513;$id++)$writer->exec('INSERT INTO mh_sales_order_item SELECT '.$id.',order_id,NULL,store_id,product_id,product_type,qty_ordered,qty_invoiced,qty_refunded,qty_canceled FROM mh_sales_order_item WHERE item_id=11');
     historyRefuse(static function()use($reader){$reader->read(1,1,7,'private@example.test');});
     $writer->exec('DELETE FROM mh_sales_order_item WHERE item_id>=1000');
-    for($id=100;$id<229;$id++)$writer->exec('INSERT INTO mh_sales_order SELECT '.$id.',store_id,customer_id,customer_is_guest,state,status,created_at,updated_at,order_currency_code,grand_total,total_paid,total_refunded FROM mh_sales_order WHERE entity_id=1');
+    for($id=100;$id<229;$id++)$writer->exec('INSERT INTO mh_sales_order (entity_id,store_id,customer_id,customer_is_guest,state,status,created_at,updated_at,order_currency_code,grand_total,total_paid,total_refunded) SELECT '.$id.',store_id,customer_id,customer_is_guest,state,status,created_at,updated_at,order_currency_code,grand_total,total_paid,total_refunded FROM mh_sales_order WHERE entity_id=1');
     historyRefuse(static function()use($reader){$reader->read(1,1,7,'private@example.test');});
     foreach(glob($directory.'/*') as $file)historyCheck(strpos((string)file_get_contents($file),'private@example.test')===false,'only nonce/rate state persisted');
     echo "$checks native customer-history SQL/protocol assertions passed (synthetic private schema).\n";

@@ -86,7 +86,7 @@ final class CustomerOrderHistory
             }
             // Read sales tables directly, including orders whose quote was removed.
             // Guest orders sharing an email are never borrowed by an account.
-            $orders = $this->rows('SELECT entity_id,state,status,created_at,updated_at,order_currency_code,grand_total,total_paid,total_refunded'
+            $orders = $this->rows('SELECT entity_id,state,status,created_at,updated_at,order_currency_code,grand_total,total_paid,total_refunded,discount_amount'
                 . ' FROM ' . $this->table('sales_order') . ' WHERE store_id=? AND customer_id=? AND customer_is_guest=0 ORDER BY entity_id',
                 [$scope,$customer], 128);
             $lines = [];
@@ -106,7 +106,7 @@ final class CustomerOrderHistory
                     'qty_refunded' => (string) $line['qty_refunded'], 'qty_canceled' => (string) $line['qty_canceled'],
                 ];
             }
-            $result = ['schema' => 'magento-customer-history-v1', 'store_id' => $scope, 'website_id' => $website,
+            $result = ['schema' => 'magento-customer-history-v2', 'store_id' => $scope, 'website_id' => $website,
                 'customer_id' => $customer, 'customer_email' => $person['email'], 'customer_group_id' => (int) $person['group_id'],
                 'customer_created_at' => $person['created_at'], 'read_at' => gmdate('Y-m-d\TH:i:s\Z'),
                 'complete' => true, 'order_count' => count($orders), 'orders' => [],
@@ -115,6 +115,7 @@ final class CustomerOrderHistory
                 $result['orders'][] = ['order_id' => (string) $order['entity_id'], 'state' => $order['state'], 'status' => $order['status'],
                     'created_at' => $order['created_at'], 'updated_at' => $order['updated_at'], 'currency' => $order['order_currency_code'],
                     'grand_total' => (string) $order['grand_total'],
+                    'discount_total' => $order['discount_amount'] === null ? null : ltrim((string) $order['discount_amount'], '-'),
                     'total_paid' => $order['total_paid'] === null ? null : (string) $order['total_paid'],
                     'total_refunded' => $order['total_refunded'] === null ? null : (string) $order['total_refunded'],
                     'items' => $items[(string) $order['entity_id']] ?? []];

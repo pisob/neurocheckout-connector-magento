@@ -1,6 +1,17 @@
 # NeuroCheckout Connector for Magento
 
-## Native account carts (candidate, 2026-10-18)
+## Native history v2 (1.0.10)
+
+The signed account-history response adds nullable `discount_total` to every
+order. Native discounts retain decimal precision; unavailable values stay null.
+PrestaShop exports native tax-inclusive discounts, WooCommerce exports its native
+order discount field (HPOS/posts), and Magento exports the magnitude of its signed
+native discount. No paid/refunded value or preference is invented by the connector.
+Older v1 history remains valid for compatible readers, with discount evidence
+unknown. Use Community preview.43 and the coordinated Cloud release. Existing
+native-cart, consent, transaction, size and timing guards still apply.
+
+## Native account carts (1.0.10)
 
 The signed `customer_carts` operation reads active native quotes for the exact
 registered customer, website and store view. A positive native item quantity
@@ -24,11 +35,11 @@ include foreign scopes, consent, inactive quotes, snapshot concurrency, read-onl
 enforcement and capacity/schema failures. Installed-store HTTP and real
 recommendation delivery remain separate acceptance work.
 
-Version 1.0.9 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent recommendation campaigns remain incomplete and are not enabled by installing this release.
+Version 1.0.10 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent campaigns are controlled by the coordinated Cloud worker; installing this connector never enables sending or changes consent.
 
 ## Product details in Community emails
 
-### Native recommendation consent (1.0.9)
+### Native recommendation consent (1.0.10)
 
 Local snapshots expose the native newsletter subscription only for an identified
 customer with matching current email, website and exact store view. Only a
@@ -44,7 +55,7 @@ before a recommendation email. This source change does not activate campaigns.
 Disposable native SQL tests cover these boundaries and retain checkout/snapshot
 regressions; real recommendation delivery remains a separate acceptance test.
 
-### Website stock evidence (1.0.9)
+### Website stock evidence (1.0.10)
 
 Snapshots now use Magento's native MSI website stock resolver and both salability
 and requested-quantity checks for one unit. This includes reservations and native
@@ -71,7 +82,7 @@ Automated coverage includes native-service contract tests and disposable SQL
 factory/snapshot tests in CI. Local native read-only checks do not replace the
 remaining real recommendation-email and checkout acceptance tests.
 
-### Recipient-specific prices (1.0.9; delivery integration remains incomplete)
+### Recipient-specific prices (1.0.10; delivery integration remains incomplete)
 
 `CustomerProductPrices` reads Magento's native one-unit final price for the
 identified customer, selected website/store view and explicitly requested
@@ -121,7 +132,7 @@ native PHP/Community bridge verified two signed three-product reads, replay
 refusal and controller construction with real Magento services. It did not
 exercise a deployed HTTPS route or change the installed module.
 
-### Native account order history (1.0.9)
+### Native account order history (1.0.10)
 
 The signed source route also supports `customer_history` for an exact native
 store/website/customer ID and current account email. `CustomerOrderHistory` reads
@@ -168,10 +179,10 @@ time to finish. Store-scoped data and database consistency checks remain enforce
 
 ## Availability
 
-The current installable connector is **v1.0.9**:
+The current installable connector is **v1.0.10**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.9/neurocheckout-connector-magento-1.0.9.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.9).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.10/neurocheckout-connector-magento-1.0.10.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.10).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
