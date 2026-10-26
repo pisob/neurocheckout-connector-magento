@@ -1,6 +1,6 @@
 # NeuroCheckout Connector for Magento
 
-## API key rotation (next release)
+## API key rotation (1.0.12)
 
 Automatic Community synchronization now keeps its encrypted snapshot key separate
 from the API key used to authenticate requests. Existing snapshots are preserved
@@ -218,10 +218,10 @@ time to finish. Store-scoped data and database consistency checks remain enforce
 
 ## Availability
 
-The current installable connector is **v1.0.11**:
+The current installable connector is **v1.0.12**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.11/neurocheckout-connector-magento-1.0.11.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.11).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-magento/releases/download/v1.0.12/neurocheckout-connector-magento-1.0.12.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-magento/releases/tag/v1.0.12).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
