@@ -66,7 +66,7 @@ class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
             'magento', $scope, BP, (string) $this->request->getMethod(),
             (string) ($_SERVER['REQUEST_URI'] ?? ''), SourcePullGateway::serverHeaders($_SERVER),
             $raw, (bool) $this->request->isSecure(),
-            function (array $input, int $scope, array $configuration, string $directory) use ($raw): array {
+            function (array $input, int $scope, array $configuration, string $directory) use ($raw, $automatic): array {
                 if (($input['operation'] ?? null)==='customer_history_index') {
                     return ['schema'=>1,'shopId'=>$input['shopId'],'operation'=>'customer_history_index',
                         'requestHash'=>hash('sha256',$raw),'index'=>$this->sourceSnapshots->customerHistory()->index($scope,$input)];
@@ -94,6 +94,9 @@ class Pull implements HttpPostActionInterface, CsrfAwareActionInterface
                         'requestHash' => hash('sha256', $raw),
                         'prices' => $this->customerPrices->read($scope, (int) $input['customerId'],
                             $input['customerEmail'], $input['productIds'], $input['currency'])];
+                }
+                if ($automatic !== null) {
+                    $configuration['secret'] = $this->config->getSourceStorageSecret($configuration, $directory);
                 }
                 return (new ReconciledSourceExporter($directory, $configuration, function () use ($scope): array {
                     return $this->sourceSnapshots->create()->capture($scope);

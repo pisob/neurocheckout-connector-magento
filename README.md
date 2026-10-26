@@ -1,5 +1,26 @@
 # NeuroCheckout Connector for Magento
 
+## API key rotation (next release)
+
+Automatic Community synchronization now keeps its encrypted snapshot key separate
+from the API key used to authenticate requests. Existing snapshots are preserved
+before changing the active API key, including manual configuration changes and
+multistore settings. Rotating a key keeps the existing stream, cursor and cart
+revisions; it does not reimport unchanged carts. Requests and responses continue
+to use the current authentication key.
+
+The storage key is encrypted with the platform encryption key in the existing
+private source-state directory. Include that directory and the platform
+encryption configuration in coordinated backups. Missing, corrupt or unwritable
+key storage stops the change instead of silently resetting synchronization. This
+protects future rotations; it cannot recover a legacy snapshot whose original
+key was already lost before installing the fix.
+
+Validation covers legacy staging/production snapshots, signed requests after
+rotation, cursor/revision continuity, scope isolation and failed migrations.
+Platform configuration tests cover automatic rotation and manual saves; live
+store credentials are not rotated by these tests.
+
 ## Scheduled local order history
 
 The signed `customer_history_index` operation discovers registered native accounts
