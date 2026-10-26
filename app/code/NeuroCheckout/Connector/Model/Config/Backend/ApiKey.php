@@ -48,6 +48,11 @@ class ApiKey extends Value
             $value = trim((string)$this->getOldValue());
         }
 
+        if ($this->getPath() === \NeuroCheckout\Connector\Model\Config::XML_PATH_API_KEY
+            && $value !== trim((string) $this->getOldValue())) {
+            $this->preserveSourceStorageKeys();
+        }
+
         if ($value !== '' && !str_starts_with($value, self::SECRET_VALUE_PREFIX)) {
             $value = self::SECRET_VALUE_PREFIX . $this->getEncryptor()->encrypt($value);
         }
@@ -55,5 +60,20 @@ class ApiKey extends Value
         $this->setValue($value);
 
         return parent::beforeSave();
+    }
+
+    public function beforeDelete(): self
+    {
+        // Switching back to an inherited website/global key is also a rotation.
+        if ($this->getPath() === \NeuroCheckout\Connector\Model\Config::XML_PATH_API_KEY) {
+            $this->preserveSourceStorageKeys();
+        }
+        return parent::beforeDelete();
+    }
+
+    private function preserveSourceStorageKeys(): void
+    {
+        ObjectManager::getInstance()->get(\NeuroCheckout\Connector\Model\Config::class)
+            ->preserveSourceStorageKeys((string) ($this->getScope() ?: 'default'), (int) $this->getScopeId());
     }
 }

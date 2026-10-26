@@ -113,6 +113,13 @@ class Config
 
     public function setValue(string $path, $value, ?int $storeId = null): void
     {
+        if ($path === self::XML_PATH_API_KEY) {
+            $old = $this->sourceApiKey((string) $this->scopeConfig->getValue($path,
+                $storeId === null ? ScopeConfigInterface::SCOPE_TYPE_DEFAULT : ScopeInterface::SCOPE_STORES, $storeId));
+            if ($old !== '' && $old !== $this->sourceApiKey((string) $value)) {
+                $this->preserveSourceStorageKeys($storeId === null ? 'default' : 'stores', $storeId ?? 0);
+            }
+        }
         if ($path === self::XML_PATH_RECOVERY_ENABLED) {
             $value = 1;
         }
@@ -127,6 +134,42 @@ class Config
 
         $this->writer->save($path, (string) $value, ScopeInterface::SCOPE_STORES, $storeId);
         $this->cleanConfigCache();
+    }
+
+    public function getSourceStorageSecret(array $configuration, string $directory): string
+    {
+        return \NeuroCheckout\Connector\Community\SourceStorageKey::resolve($directory, $configuration,
+            function (string $plain): string { return $this->encryptor->encrypt($plain); },
+            function (string $value): string { return $this->encryptor->decrypt($value); });
+    }
+
+    public function preserveSourceStorageKeys(string $scope, int $scopeId): void
+    {
+        if (!in_array($scope, ['default', 'websites', 'stores'], true)
+            || ($scope !== 'default' && $scopeId < 1)) { throw new \RuntimeException('source_storage_key_unavailable'); }
+        $manager = \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Store\Model\StoreManagerInterface::class);
+        foreach ($manager->getStores(false) as $store) {
+            $id = (int) $store->getId();
+            if ($id < 1 || ($scope === 'stores' && $id !== $scopeId)
+                || ($scope === 'websites' && (int) $store->getWebsiteId() !== $scopeId)) { continue; }
+            $directory = BP . '/var/neurocheckout-community-source/' . $id;
+            if (!file_exists($directory) && !is_link($directory)) { continue; }
+            $environment = \NeuroCheckout\Connector\Community\AutomaticSourceBinding::environment($this->getString(self::XML_PATH_API_ENDPOINT, $id));
+            $shopId = $this->getString(self::XML_PATH_SHOP_EXTERNAL_ID, $id);
+            $apiKey = $this->sourceApiKey((string) $this->scopeConfig->getValue(self::XML_PATH_API_KEY, ScopeInterface::SCOPE_STORES, $id));
+            if ($environment === null || $shopId === '' || $apiKey === '') { continue; }
+            $this->getSourceStorageSecret(['environment'=>$environment, 'platform'=>'magento', 'nativeScope'=>$id,
+                'shopId'=>$shopId, 'secret'=>\NeuroCheckout\Connector\Community\AutomaticSourceBinding::secret($apiKey, $shopId)], $directory);
+        }
+    }
+
+    private function sourceApiKey(string $value): string
+    {
+        $value = trim($value);
+        if (!str_starts_with($value, self::SECRET_VALUE_PREFIX)) { return $value; }
+        $decoded = trim((string) $this->encryptor->decrypt(substr($value, strlen(self::SECRET_VALUE_PREFIX))));
+        if ($decoded === '') { throw new \RuntimeException('source_storage_key_unavailable'); }
+        return $decoded;
     }
 
     public function isIaConfigurationReady(?int $storeId = null): bool
